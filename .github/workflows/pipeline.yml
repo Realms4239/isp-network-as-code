@@ -42,8 +42,19 @@ jobs:
 
       - name: Install pinned Ansible collections
         run: |
-          ANSIBLE_COLLECTIONS_PATH="${GITHUB_WORKSPACE}/ansible/collections" \
-            ansible-galaxy collection install -r ansible/requirements.yml -p ansible/collections
+          mkdir -p ansible/collections
+          ansible-galaxy collection install \
+            --requirements-file ansible/requirements.yml \
+            --collections-path "${GITHUB_WORKSPACE}/ansible/collections" \
+            --force
+          # Fail loudly with the resolved tree if anything above did not land,
+          # so a collection problem names itself instead of surfacing later as
+          # an unrelated playbook or lint error.
+          ansible-galaxy collection list --collections-path "${GITHUB_WORKSPACE}/ansible/collections"
+          for c in nokia.srlinux ansible.netcommon ansible.utils; do
+            test -d "${GITHUB_WORKSPACE}/ansible/collections/ansible_collections/${c%%.*}/${c#*.}" \
+              || { echo "missing collection: ${c}"; exit 1; }
+          done
 
       - name: Validate cross-file contracts and negative cases
         run: |

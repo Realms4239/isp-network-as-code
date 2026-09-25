@@ -113,59 +113,84 @@ jobs:
 
   deploy-and-validate:
     name: Containerlab, Ansible, and pyATS Verification
-    # Runs on pushes and on same-repo pull requests, and only when the lab
-    # credential actually exists. Without SRL_PASSWORD the live stage cannot do
-    # anything useful, and failing deep inside the deploy step with a vendor
-    # error would misreport a missing secret as a broken lab. The `lint` job is
-    # the authoritative gate in every case; this job is the optional live proof.
+    # The `secrets` context is NOT available in a job-level `if` (only github,
+    # needs, vars and inputs are), so the credential check has to be a step.
+    # See "Detect lab credentials" below, which gates every later step.
     if: >-
       needs.lint.result == 'success' &&
-      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
-      secrets.SRL_PASSWORD != ''
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-22.04
     needs: lint
     timeout-minutes: 45
     env:
       SRL_PASSWORD: ${{ secrets.SRL_PASSWORD }}
     steps:
+      - name: Detect lab credentials
+        id: creds
+        # The live stage needs a real SR Linux credential. Without it the job
+        # would fail deep inside the deploy step with a vendor error that says
+        # nothing about the missing secret. Decide it here, say so plainly, and
+        # skip the rest of the job rather than report a failure that is really
+        # a setup gap. The offline `lint` job is the authoritative gate.
+        run: |
+          if [ -z "${SRL_PASSWORD:-}" ]; then
+            echo "::warning title=Lab secret missing::SRL_PASSWORD is not set, so the live lab stage is skipped."
+            echo "The offline quality gates are the signal for this run."
+            echo "To enable the live stage:"
+            echo "  gh secret set SRL_PASSWORD --repo Realms4239/isp-network-as-code"
+            echo "See docs/EVIDENCE.md for why the lab password is never committed."
+            echo "has_creds=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "SRL_PASSWORD is present; running the live lab stage."
+            echo "has_creds=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Check out repository
+        if: steps.creds.outputs.has_creds == 'true'
         uses: actions/checkout@v4
 
       - name: Set up Python
+        if: steps.creds.outputs.has_creds == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: 'pip'
 
       - name: Install system dependencies
+        if: steps.creds.outputs.has_creds == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y curl openssh-client coreutils
 
       - name: Install pinned Containerlab
+        if: steps.creds.outputs.has_creds == 'true'
         run: |
           curl -sL https://get.containerlab.dev | bash -s -- --version "${CONTAINERLAB_VERSION}" --verify-checksum
           clab version
           clab version | grep -F "${CONTAINERLAB_VERSION}"
 
       - name: Install pinned Python and Ansible dependencies
+        if: steps.creds.outputs.has_creds == 'true'
         run: |
           python -m pip install --requirement pyats/requirements.txt
           ANSIBLE_COLLECTIONS_PATH="${GITHUB_WORKSPACE}/ansible/collections" \
           ansible-galaxy collection install -r ansible/requirements.yml -p ansible/collections
 
       - name: Prepare ephemeral FRR management key and lab files
+        if: steps.creds.outputs.has_creds == 'true'
         run: |
           bash scripts/prepare_lab.sh
           chmod 600 "${FRR_SSH_KEY}"
 
       - name: Deploy topology and wait for both SR Linux nodes
+        if: steps.creds.outputs.has_creds == 'true'
         run: |
           sudo clab deploy -t topology/topology.clab.yml
           sudo clab inspect --all --format json > artifacts-containerlab-inspect.json
           python scripts/wait_for_lab.py --plan data/lab.yml --attempts 30 --delay 10
 
       - name: Run Ansible configuration (run 1)
+        if: steps.creds.outputs.has_creds == 'true'
         run: |
           cd ansible
           ANSIBLE_CONFIG="${GITHUB_WORKSPACE}/ansible/ansible.cfg" \
@@ -174,6 +199,7 @@ jobs:
           ansible-playbook -i inventories/hosts.ini site.yml > ../artifacts-ansible-run-1.json
 
       - name: Enforce exact Ansible idempotency (run 2)
+        if: steps.creds.outputs.has_creds == 'true'
         run: |
           set +e
           cd ansible
@@ -193,6 +219,7 @@ jobs:
             --report artifacts-ansible-check-2.json --run-id "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
 
       - name: Run protocol and data-plane gates
+        if: steps.creds.outputs.has_creds == 'true'
         run: |
           cd pyats
           pyats run job test_job.py --testbed-file testbed.yml 2>&1 | tee ../artifacts-pyats.log

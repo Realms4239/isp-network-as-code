@@ -228,7 +228,12 @@ jobs:
           pyats run job test_job.py --testbed-file testbed.yml 2>&1 | tee ../artifacts-pyats.log
 
       - name: Collect diagnostics and preserve failure evidence
-        if: always()
+        # `always()` because it must run on failure — but only once the lab was
+        # actually deployed. With no credential the step above never ran, so
+        # there are no artifacts, no running topology, and no checkout; running
+        # it anyway would fail on missing files and turn an honest skip into a
+        # red run.
+        if: always() && steps.creds.outputs.has_creds == 'true'
         run: |
           mkdir -p artifacts
           cp -f artifacts-*.* artifacts/ 2>/dev/null || true
@@ -242,11 +247,14 @@ jobs:
           sudo docker ps -a --filter name=clab-isp-backbone --format '{{.Names}} {{.Status}}' > artifacts/docker-state.txt || true
 
       - name: Destroy topology unconditionally
-        if: always()
+        # Same reasoning as diagnostics: only tear down what was actually
+        # deployed. `always()` is still required so a mid-run failure does not
+        # leave containers behind.
+        if: always() && steps.creds.outputs.has_creds == 'true'
         run: sudo clab destroy -t topology/topology.clab.yml --cleanup
 
       - name: Upload diagnostics
-        if: always()
+        if: always() && steps.creds.outputs.has_creds == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: phase0-diagnostics

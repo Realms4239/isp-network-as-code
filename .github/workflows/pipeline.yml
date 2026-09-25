@@ -78,6 +78,20 @@ jobs:
             ansible/roles ansible/plugins \
             || { echo "--- yamllint failed on ansible sources ---"; exit 1; }
 
+      - name: Verify Ansible can resolve the installed collections
+        working-directory: ansible
+        env:
+          ANSIBLE_CONFIG: ${{ github.workspace }}/ansible/ansible.cfg
+          ANSIBLE_COLLECTIONS_PATH: ${{ github.workspace }}/ansible/collections
+        # Guards a failure that used to surface much later as an opaque
+        # ansible-lint "internal-error": ansible.cfg pinned a relative
+        # collections_path, which overrides ANSIBLE_COLLECTIONS_PATH, so a run
+        # from the wrong CWD could not resolve nokia.srlinux at all.
+        run: |
+          ansible-config dump --only-changed
+          ansible-galaxy collection list
+          ansible-playbook --syntax-check site.yml
+
       - name: Lint Ansible
         working-directory: ansible
         env:
@@ -147,6 +161,7 @@ jobs:
         run: |
           cd ansible
           ANSIBLE_CONFIG="${GITHUB_WORKSPACE}/ansible/ansible.cfg" \
+          ANSIBLE_COLLECTIONS_PATH="${GITHUB_WORKSPACE}/ansible/collections" \
           ANSIBLE_STDOUT_CALLBACK=lab_json \
           ansible-playbook -i inventories/hosts.ini site.yml > ../artifacts-ansible-run-1.json
 
@@ -155,6 +170,7 @@ jobs:
           set +e
           cd ansible
           ANSIBLE_CONFIG="${GITHUB_WORKSPACE}/ansible/ansible.cfg" \
+          ANSIBLE_COLLECTIONS_PATH="${GITHUB_WORKSPACE}/ansible/collections" \
           ANSIBLE_STDOUT_CALLBACK=lab_json \
           ansible-playbook -i inventories/hosts.ini site.yml > ../artifacts-ansible-run-2.json
           rc=$?

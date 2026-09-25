@@ -16,6 +16,11 @@ export SRL_USER="${SRL_USER:-admin}"
 export SRL_PASSWORD
 export FRR_USER="${FRR_USER:-root}"
 export FRR_SSH_KEY="${FRR_SSH_KEY:-${ROOT_DIR}/.lab/ssh/id_ed25519}"
+# Single source of truth for collection resolution. Exported once here so every
+# ansible-galaxy, ansible-playbook, and ansible-lint call below inherits it.
+# ansible.cfg deliberately does not set collections_path, because a value there
+# takes precedence over this variable.
+export ANSIBLE_COLLECTIONS_PATH="${ROOT_DIR}/ansible/collections"
 
 for command in bash clab sudo ansible-playbook ansible-galaxy pyats python3 ssh-keygen install; do
   command -v "${command}" >/dev/null || { echo "ERROR: ${command} is not installed." >&2; exit 1; }
@@ -49,8 +54,17 @@ record_stage contract passed
 
 record_stage collections started
 echo "[2/7] Installing pinned Ansible collections..."
+# ansible.cfg deliberately does not set collections_path: a value there
+# overrides this variable, which previously made collection resolution depend
+# on the config file and broke the syntax check on CI. One source of truth here.
 ANSIBLE_COLLECTIONS_PATH="${ROOT_DIR}/ansible/collections" \
   ansible-galaxy collection install -r ansible/requirements.yml -p "${ROOT_DIR}/ansible/collections"
+# Fail here, naming the problem, instead of letting it surface later as an
+# opaque playbook or lint error.
+for c in nokia.srlinux ansible.netcommon ansible.utils; do
+  test -d "${ROOT_DIR}/ansible/collections/ansible_collections/${c%%.*}/${c#*.}" \
+    || { echo "ERROR: missing collection ${c}" >&2; exit 1; }
+done
 record_stage collections passed
 
 record_stage deploy started

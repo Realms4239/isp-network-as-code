@@ -137,20 +137,42 @@ def test_role_vars_are_mappings_not_lists():
 
 
 def test_role_vars_define_the_vars_their_tasks_consume():
-    """srlinux_candidate is referenced by tasks/main.yml, so it must exist."""
+    """The candidate list is consumed by tasks/main.yml, so it must exist there."""
     tasks = (ROOT / "ansible/roles/srlinux_ospf/tasks/main.yml").read_text(encoding="utf-8")
     role_vars = yaml.safe_load(
         (ROOT / "ansible/roles/srlinux_ospf/vars/main.yml").read_text(encoding="utf-8")
     )
-    if "srlinux_candidate" in tasks:
-        assert "srlinux_candidate" in role_vars, (
-            "tasks/main.yml consumes srlinux_candidate but vars/main.yml does not define it"
+    # Role variables must carry the role prefix (ansible-lint var-naming rule).
+    key = "srlinux_ospf_candidate"
+    assert key in role_vars, f"vars/main.yml must define {key}"
+    assert isinstance(role_vars[key], list)
+    assert role_vars[key], f"{key} must not be empty"
+    for entry in role_vars[key]:
+        assert "path" in entry and "value" in entry, (
+            "each candidate entry needs both 'path' and 'value' for nokia.srlinux.config"
         )
-        assert isinstance(role_vars["srlinux_candidate"], list)
-        assert role_vars["srlinux_candidate"], "srlinux_candidate must not be empty"
-        for entry in role_vars["srlinux_candidate"]:
-            assert "path" in entry and "value" in entry, (
-                "each candidate entry needs both 'path' and 'value' for nokia.srlinux.config"
+    assert key in tasks, f"tasks/main.yml must consume {key}"
+
+
+def test_role_prefixed_variables_only():
+    """Every role var and registered var carries its role name as a prefix.
+
+    ansible-lint's var-naming[no-role-prefix] rule is fatal under the production
+    profile this repo pins, and an unprefixed role variable can silently collide
+    with a same-named variable defined elsewhere in the play.
+    """
+    for tasks_file in sorted(ROOT.glob("ansible/roles/*/{tasks,handlers}/*.yml")):
+        role = tasks_file.parents[1].name
+        for line in tasks_file.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if stripped.startswith("#") or "register:" not in stripped:
+                continue
+            name = stripped.split("register:", 1)[1].strip()
+            if not name or name.startswith(("{{", "!")):
+                continue
+            assert name.startswith(f"{role}_"), (
+                f"{tasks_file.relative_to(ROOT)} registers '{name}'; role variables "
+                f"must be prefixed with '{role}_'"
             )
 
 

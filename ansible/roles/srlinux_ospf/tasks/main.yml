@@ -12,7 +12,7 @@
 
 - name: Validate the complete Nokia SR Linux base candidate before applying it
   nokia.srlinux.validate:
-    update: "{{ srlinux_candidate }}"
+    update: "{{ srlinux_ospf_candidate }}"
 
 - name: Validate each Nokia SR Linux BGP neighbor before applying it
   nokia.srlinux.validate:
@@ -33,7 +33,7 @@
 - name: Apply the complete Nokia SR Linux base candidate
   nokia.srlinux.config:
     save_when: changed
-    update: "{{ srlinux_candidate }}"
+    update: "{{ srlinux_ospf_candidate }}"
 
 - name: Apply each Nokia SR Linux BGP neighbor
   nokia.srlinux.config:

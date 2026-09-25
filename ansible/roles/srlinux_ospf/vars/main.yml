@@ -7,7 +7,7 @@
 # The JSON-RPC candidate list is defined once here under a named key and
 # consumed as `srlinux_candidate` in tasks/main.yml, so the payload lives in one
 # place and the role vars stay a valid mapping.
-srlinux_candidate:
+srlinux_ospf_candidate:
   - path: /interface[name=ethernet-1/1]
     value:
       admin-state: enable

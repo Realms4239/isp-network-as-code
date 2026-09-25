@@ -2,6 +2,8 @@
 - name: Reload FRR configuration
   ansible.builtin.command:
     cmd: /usr/lib/frr/frr-reload.py --reload /etc/frr/frr.conf
-  register: frr_reload
+  # Registered variables need the role prefix (var-naming[no-role-prefix]),
+  # otherwise a role variable can collide with a same-named variable elsewhere.
+  register: frr_bgp_reload
   changed_when: true
-  failed_when: frr_reload.rc != 0
+  failed_when: frr_bgp_reload.rc != 0

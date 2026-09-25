@@ -1,17 +1,26 @@
 ---
-- name: Ensure FRR daemons configuration is present
-  ansible.builtin.template:
-    src: daemons
-    dest: /etc/frr/daemons
-    mode: '0644'
-  notify: Restart FRR
+- name: Assert required FRR variables
+  ansible.builtin.assert:
+    that:
+      - loopback_ip is defined
+      - router_id is defined
+      - srl01_ip is defined
+      - srl02_ip is defined
+      - bgp_peers is defined
+      - bgp_peers | length > 0
+    fail_msg: "Missing required FRR routing variables on {{ inventory_hostname }}"
 
 - name: Deploy FRR routing configuration (BGP)
   ansible.builtin.template:
     src: frr.conf.j2
     dest: /etc/frr/frr.conf
+    # The file is bind-mounted from the lab directory; atomic replacement would
+    # fail with "device or resource busy" on that mount point. Ansible validates
+    # the rendered candidate before it is written, so a bad config cannot break
+    # the running FRR daemon.
+    atomic: false
+    validate: vtysh -C -f %s
     mode: '0640'
     owner: frr
     group: frr
   notify: Reload FRR
-

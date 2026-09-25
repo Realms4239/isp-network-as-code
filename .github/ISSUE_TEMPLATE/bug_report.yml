@@ -1,0 +1,40 @@
+---
+name: Bug report
+description: Report a reproducible defect in the offline gates or lab lifecycle
+labels: [bug, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include passwords, private keys, tokens, or customer data.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What failed, and what was expected?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Minimal commands or steps that reproduce the issue.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python, Docker, Containerlab, Ansible, and pyATS versions.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted evidence
+      description: Relevant stage event, error message, or redacted artifact excerpt.
+  - type: checkboxes
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: I confirmed that this report contains no secrets or private keys.
+          required: true

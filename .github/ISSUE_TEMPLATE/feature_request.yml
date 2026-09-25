@@ -1,0 +1,35 @@
+---
+name: Feature or extension
+description: Propose a scalable lab, node-type, protocol, or evidence enhancement
+labels: [enhancement, needs-triage]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What capability is missing or what friction exists?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Describe the smallest coherent change and its extension points.
+    validations:
+      required: true
+  - type: textarea
+    id: plan
+    attributes:
+      label: data/lab.yml impact
+      description: Show the new node type, node, link, host variable, or evidence fields.
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification
+      description: List offline and live tests that would prove the change.
+  - type: checkboxes
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: I confirmed that this proposal contains no secrets or private keys.
+          required: true

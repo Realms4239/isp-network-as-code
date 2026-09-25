@@ -1,0 +1,123 @@
+---
+version: 1
+name: isp-backbone
+
+security:
+  lab_only: true
+  management_transport: http
+  ssh_host_key_checking: disabled
+  frr_ssh_user: root
+  rationale: disposable isolated lab; never reuse these settings in production
+
+management:
+  network: mgmt-isp
+  ipv4_subnet: 172.20.20.0/24
+
+node_types:
+  srl:
+    topology_group: srl
+    ansible_group: srlinux
+    role: srlinux_ospf
+    kind: nokia_srlinux
+    image: ghcr.io/nokia/srlinux:24.10.1
+    type: ixrd2l
+    allowed_interfaces: [e1-1, e1-2]
+    interface_map:
+      core: e1-1
+      transit: e1-2
+      loopback: system0
+    required_host_vars: [loopback_ip, core_ip, transit_ip, bgp_peers]
+    as_number: 65001
+  frr:
+    topology_group: frr
+    ansible_group: frr
+    role: frr_bgp
+    kind: linux
+    image: quay.io/frrouting/frr:containerlab-10.7.1
+    allowed_interfaces: [eth1, eth2]
+    interface_map:
+      srl01: eth1
+      srl02: eth2
+      loopback: lo
+    required_host_vars: [loopback_ip, srl01_ip, srl02_ip, bgp_peers]
+    as_number: 65002
+    required_binds:
+      - .lab/ssh/authorized_keys
+      - .lab/frr/daemons
+      - .lab/frr/frr.conf
+      - .lab/frr/vtysh.conf
+
+nodes:
+  srl01:
+    type: srl
+    group: srl
+    mgmt_ipv4: 172.20.20.11
+    host_vars:
+      loopback_ip: 10.0.0.1/32
+      core_ip: 10.1.12.1/24
+      transit_ip: 10.1.13.1/24
+      bgp_peers:
+        - peer_ip: 10.1.13.2
+          remote_as: 65002
+          description: eBGP to FRR01
+        - peer_ip: 10.0.0.2
+          remote_as: 65001
+          description: iBGP to SRL02
+  srl02:
+    type: srl
+    group: srl
+    mgmt_ipv4: 172.20.20.12
+    host_vars:
+      loopback_ip: 10.0.0.2/32
+      core_ip: 10.1.12.2/24
+      transit_ip: 10.1.23.1/24
+      bgp_peers:
+        - peer_ip: 10.1.23.2
+          remote_as: 65002
+          description: eBGP to FRR01
+        - peer_ip: 10.0.0.1
+          remote_as: 65001
+          description: iBGP to SRL01
+  frr01:
+    type: frr
+    group: frr
+    mgmt_ipv4: 172.20.20.13
+    host_vars:
+      loopback_ip: 10.0.0.3/32
+      srl01_ip: 10.1.13.2/24
+      srl02_ip: 10.1.23.2/24
+      bgp_peers:
+        - peer_ip: 10.1.13.1
+          remote_as: 65001
+          description: eBGP to SRL01
+        - peer_ip: 10.1.23.1
+          remote_as: 65001
+          description: eBGP to SRL02
+
+links:
+  - endpoints: [srl01:e1-1, srl02:e1-1]
+    protocols: [ospf]
+  - endpoints: [srl01:e1-2, frr01:eth1]
+    protocols: [bgp]
+  - endpoints: [srl02:e1-2, frr01:eth2]
+    protocols: [bgp]
+
+pyats:
+  interfaces:
+    srl01: [ethernet-1/1, ethernet-1/2, system0]
+    srl02: [ethernet-1/1, ethernet-1/2, system0]
+    frr01: [eth1, eth2, lo]
+  ospf_neighbors:
+    srl01: 10.1.12.2
+    srl02: 10.1.12.1
+  routes:
+    srl01: [10.0.0.2/32, 10.0.0.3/32]
+    srl02: [10.0.0.1/32, 10.0.0.3/32]
+    frr01: [10.0.0.1/32, 10.0.0.2/32]
+  reachability:
+    - [srl01, 10.0.0.2]
+    - [srl02, 10.0.0.1]
+    - [srl01, 10.0.0.3]
+    - [frr01, 10.0.0.1]
+    - [srl02, 10.0.0.3]
+    - [frr01, 10.0.0.2]

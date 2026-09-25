@@ -1,0 +1,24 @@
+repos:
+  - repo: local
+    hooks:
+      - id: contract
+        name: contract validation
+        entry: python scripts/validate_contract.py
+        language: system
+        pass_filenames: false
+      - id: pytest
+        name: offline tests
+        entry: python -m pytest -q tests
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+      - id: flake8
+        name: python lint
+        entry: flake8 pyats scripts ansible/plugins/callback tests --max-line-length=120
+        language: system
+        files: \.py$
+      - id: yamllint
+        name: yaml lint
+        entry: yamllint data/ topology/ ansible/ observability/ pyats/ .github/workflows/pipeline.yml .github/ISSUE_TEMPLATE/ .github/dependabot.yml
+        language: system
+        files: \.ya?ml$

@@ -1,8 +1,7 @@
-frr version 9.1
+frr version 10.7
 frr defaults traditional
 hostname {{ inventory_hostname }}
 no ipv6 forwarding
-service integrated-vtysh-config
 !
 interface eth1
  ip address {{ srl01_ip }}

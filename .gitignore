@@ -47,3 +47,11 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# Local lab artifacts and credentials
+artifacts/
+artifacts-redacted/
+.lab/
+ansible/collections/
+pyats/logs/
+.pytest_cache/

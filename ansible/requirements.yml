@@ -1,6 +1,8 @@
 ---
 collections:
   - name: nokia.srlinux
-    version: ">=0.3.0"
+    version: "1.1.1"
   - name: ansible.netcommon
-    version: ">=5.0.0"
+    version: "8.7.1"
+  - name: ansible.utils
+    version: "6.1.1"

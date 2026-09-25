@@ -1,119 +1,24 @@
 ---
-- name: Apply Nokia SR Linux Base Interface Configuration
-  nokia.srlinux.config:
+- name: Assert required Nokia SR Linux variables
+  ansible.builtin.assert:
+    that:
+      - core_ip is defined
+      - transit_ip is defined
+      - loopback_ip is defined
+      - router_id is defined
+      - bgp_peers is defined
+      - bgp_peers | length > 0
+    fail_msg: "Missing required SR Linux routing variables on {{ inventory_hostname }}"
+
+- name: Validate the complete Nokia SR Linux base candidate before applying it
+  nokia.srlinux.validate:
+    update: "{{ srlinux_candidate }}"
+
+- name: Validate each Nokia SR Linux BGP neighbor before applying it
+  nokia.srlinux.validate:
     update:
-      - path: /interface[name=ethernet-1/1]
-        val:
-          admin-state: enable
-          subinterface:
-            - index: 0
-              ipv4:
-                admin-state: enable
-                address:
-                  - ip-prefix: "{{ core_ip }}"
-
-      - path: /interface[name=ethernet-1/2]
-        val:
-          admin-state: enable
-          subinterface:
-            - index: 0
-              ipv4:
-                admin-state: enable
-                address:
-                  - ip-prefix: "{{ transit_ip }}"
-
-      - path: /interface[name=system0]
-        val:
-          admin-state: enable
-          subinterface:
-            - index: 0
-              ipv4:
-                admin-state: enable
-                address:
-                  - ip-prefix: "{{ loopback_ip }}"
-
-- name: Configure Network Instance Default & Protocols (OSPF)
-  nokia.srlinux.config:
-    update:
-      - path: /network-instance[name=default]
-        val:
-          type: default
-          admin-state: enable
-          router-id: "{{ router_id }}"
-          interface:
-            - name: system0.0
-            - name: ethernet-1/1.0
-            - name: ethernet-1/2.0
-          protocols:
-            ospf:
-              instance:
-                - name: default
-                  admin-state: enable
-                  router-id: "{{ router_id }}"
-                  version: ospf-v2
-                  area:
-                    - area-id: "{{ ospf_area }}"
-                      interface:
-                        - interface-name: ethernet-1/1.0
-                          interface-type: point-to-point
-                          admin-state: enable
-                        - interface-name: system0.0
-                          passive: true
-                          admin-state: enable
-
-- name: Configure permissive routing-policy for loopback advertisement
-  nokia.srlinux.config:
-    update:
-      - path: /routing-policy
-        val:
-          prefix-set:
-            - name: loopbacks
-              prefix:
-                - ip-prefix: "{{ loopback_ip }}"
-                  mask-length-range: exact
-          policy:
-            - name: export-loopbacks
-              statement:
-                - name: "10"
-                  match:
-                    prefix:
-                      prefix-set: "[ loopbacks ]"
-                  action:
-                    policy-result: accept
-
-- name: Configure BGP global, groups, and neighbors (eBGP + iBGP)
-  nokia.srlinux.config:
-    update:
-      - path: /network-instance[name=default]/protocols/bgp
-        val:
-          admin-state: enable
-          autonomous-system: "{{ as_number }}"
-          router-id: "{{ router_id }}"
-          ebgp-default-policy:
-            export-reject-all: false
-            import-reject-all: false
-          afi-safi:
-            - afi-safi-name: ipv4-unicast
-              admin-state: enable
-          group:
-            - group-name: ebgp-transit
-              admin-state: enable
-              export-policy: "[ export-loopbacks ]"
-              afi-safi:
-                - afi-safi-name: ipv4-unicast
-                  admin-state: enable
-            - group-name: ibgp-core
-              admin-state: enable
-              export-policy: "[ export-loopbacks ]"
-              afi-safi:
-                - afi-safi-name: ipv4-unicast
-                  admin-state: enable
-
-- name: Attach individual BGP neighbors to peer-groups
-  nokia.srlinux.config:
-    update:
-      - path: /network-instance[name=default]/protocols/bgp/neighbor[peer-address={{ item.peer_ip }}]
-        val:
+      - path: "/network-instance[name=default]/protocols/bgp/neighbor[peer-address={{ item.peer_ip }}]"
+        value:
           peer-group: "{{ 'ebgp-transit' if item.remote_as != as_number else 'ibgp-core' }}"
           peer-as: "{{ item.remote_as }}"
           description: "{{ item.description }}"
@@ -125,4 +30,24 @@
   loop_control:
     label: "{{ item.peer_ip }} AS{{ item.remote_as }}"
 
+- name: Apply the complete Nokia SR Linux base candidate
+  nokia.srlinux.config:
+    save_when: changed
+    update: "{{ srlinux_candidate }}"
 
+- name: Apply each Nokia SR Linux BGP neighbor
+  nokia.srlinux.config:
+    save_when: changed
+    update:
+      - path: "/network-instance[name=default]/protocols/bgp/neighbor[peer-address={{ item.peer_ip }}]"
+        value:
+          peer-group: "{{ 'ebgp-transit' if item.remote_as != as_number else 'ibgp-core' }}"
+          peer-as: "{{ item.remote_as }}"
+          description: "{{ item.description }}"
+          admin-state: enable
+          afi-safi:
+            - afi-safi-name: ipv4-unicast
+              admin-state: enable
+  loop: "{{ bgp_peers }}"
+  loop_control:
+    label: "{{ item.peer_ip }} AS{{ item.remote_as }}"

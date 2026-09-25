@@ -1,3 +1,4 @@
+---
 name: isp-backbone
 
 mgmt:
@@ -5,34 +6,34 @@ mgmt:
   ipv4-subnet: 172.20.20.0/24
 
 topology:
-  kinds:
-    nokia_srlinux:
+  groups:
+    srl:
+      kind: nokia_srlinux
       image: ghcr.io/nokia/srlinux:24.10.1
       type: ixrd2l
-    linux:
-      image: frrouting/frr:v9.1.0
+    frr:
+      kind: linux
+      image: quay.io/frrouting/frr:containerlab-10.7.1
 
   nodes:
     srl01:
-      kind: nokia_srlinux
+      group: srl
       mgmt-ipv4: 172.20.20.11
-
     srl02:
-      kind: nokia_srlinux
+      group: srl
       mgmt-ipv4: 172.20.20.12
-
     frr01:
-      kind: linux
+      group: frr
       mgmt-ipv4: 172.20.20.13
       binds:
-        - ../ansible/roles/frr_bgp/templates/daemons:/etc/frr/daemons:ro
+        - ../.lab/ssh/authorized_keys:/root/.ssh/authorized_keys:ro
+        - ../.lab/frr/daemons:/etc/frr/daemons:ro
+        - ../.lab/frr/frr.conf:/etc/frr/frr.conf
+        - ../.lab/frr/vtysh.conf:/etc/frr/vtysh.conf:ro
 
   links:
-    # Core Interconnect srl01 <-> srl02
+    # Core interconnect: srl01 <-> srl02
     - endpoints: ["srl01:e1-1", "srl02:e1-1"]
-    # Transit link srl01 <-> frr01
+    # Transit links: srl01 <-> frr01 and srl02 <-> frr01
     - endpoints: ["srl01:e1-2", "frr01:eth1"]
-    # Transit link srl02 <-> frr01
     - endpoints: ["srl02:e1-2", "frr01:eth2"]
-
-

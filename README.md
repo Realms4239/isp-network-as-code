@@ -1,14 +1,14 @@
 # ISP Network as Code (Flagship)
 
-> **Autonomous Backbone as Code**: Declare backbone topology, configure OSPF & BGP via Ansible with strict idempotency, assert operational health with Cisco pyATS / Genie in CI/CD, and stream real-time telemetry to Prometheus & Grafana.
+> **Autonomous Backbone as Code**: Declare backbone topology, configure OSPF & BGP via Ansible with strict idempotency, assert operational health with Cisco pyATS / Genie in CI/CD, and provide optional Prometheus/Grafana observability configuration.
 
 [![NetDevOps CI/CD Pipeline](https://github.com/Realms4239/isp-network-as-code/actions/workflows/pipeline.yml/badge.svg)](https://github.com/Realms4239/isp-network-as-code/actions/workflows/pipeline.yml)
-[![Containerlab](https://img.shields.io/badge/Containerlab-0.50%2B-blue.svg)](https://containerlab.dev)
-[![Nokia SR Linux](https://img.shields.io/badge/Nokia-SR%20Linux-183660.svg)](https://learn.srlinux.dev)
-[![FRRouting](https://img.shields.io/badge/FRR-9.x-orange.svg)](https://frrouting.org)
-[![Ansible](https://img.shields.io/badge/Ansible-2.15%2B-EE0000.svg)](https://docs.ansible.com)
-[![Cisco pyATS](https://img.shields.io/badge/pyATS-Genie-049fd9.svg)](https://developer.cisco.com/pyats/)
-[![Prometheus](https://img.shields.io/badge/Prometheus-Monitoring-e6522c.svg)](https://prometheus.io)
+[![Containerlab](https://img.shields.io/badge/Containerlab-0.71.0-blue.svg)](https://containerlab.dev)
+[![Nokia SR Linux](https://img.shields.io/badge/Nokia-SR%20Linux-24.10.1-183660.svg)](https://learn.srlinux.dev)
+[![FRRouting](https://img.shields.io/badge/FRR-10.7.1-orange.svg)](https://frrouting.org)
+[![Ansible](https://img.shields.io/badge/Ansible-2.21.4-EE0000.svg)](https://docs.ansible.com)
+[![Cisco pyATS](https://img.shields.io/badge/pyATS-Genie-26.8-049fd9.svg)](https://developer.cisco.com/pyats/)
+[![Prometheus](https://img.shields.io/badge/Prometheus-config-available-e6522c.svg)](https://prometheus.io)
 
 ---
 
@@ -23,11 +23,31 @@ Network engineers at ISPs traditionally configure routers by hand over SSH. Huma
    - Line protocol up/up across all backbone interfaces.
    - OSPF adjacencies reaching `FULL` state.
    - BGP peering reaching `ESTABLISHED` state.
-   - End-to-end packet reachability across the transit fabric.
-4. **End-to-End CI/CD**: Cloud runners lint, spin up the virtual lab, deploy configurations, run pyATS test suites, verify telemetry, and teardown cleanly in under 5 minutes.
-5. **Real-time Observability**: Prometheus scraping exporter metrics + Grafana operational dashboards for router CPU, interface traffic, and routing protocol health.
+   - Expected route tables: SRL nodes must have the remote loopback via BGP/OSPF, and FRR must have both SRL loopbacks.
+   - Bidirectional ICMP: `srl01 <-> srl02`, `srl01 <-> frr01`, and `srl02 <-> frr01`.
+4. **Deterministic Evidence**: `scripts/lab_evidence.py` emits stage events, redacts secret material, and produces a SHA-256 artifact manifest.
+5. **CI/CD**: Cloud runners lint, spin up the virtual lab, deploy configurations, run pyATS test suites, verify telemetry, and teardown cleanly in under 5 minutes.
+6. **Optional Observability**: Prometheus and Grafana provisioning examples are provided under `observability/`; exporters are not part of the Phase 0 container topology.
 
 ---
+
+## Project governance
+
+- [Contributing guide](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
+- [Code of conduct](CODE_OF_CONDUCT.md)
+- [Changelog](CHANGELOG.md)
+- [Evidence contract](docs/EVIDENCE.md)
+- [Extension guide](docs/EXTENDING.md)
+
+## 🗂️ Repository Map
+
+- **Data and contract**: `data/lab.yml` is the declarative plan; `scripts/validate_contract.py` checks every projection against it.
+- **Topology**: `topology/topology.clab.yml` is the Containerlab projection.
+- **Configuration**: `ansible/` contains inventory, group variables, host variables, and role-specific protocol configuration.
+- **Verification**: `pyats/` contains the testbed, job, and protocol/data-plane assertions.
+- **Operations**: `scripts/` contains preparation, local lifecycle, contract validation, and result validation.
+- **CI**: `.github/workflows/pipeline.yml` runs offline quality gates before the live lab stage.
 
 ## 📐 Topology Diagram
 
@@ -62,34 +82,23 @@ Network engineers at ISPs traditionally configure routers by hand over SSH. Huma
 
 ### Requirements
 - Linux (Ubuntu 22.04 LTS or Debian 12 recommended) or Linux VM.
-- Docker CE (`>= 24.0`)
-- Containerlab (`>= 0.50.0`)
-- Python 3.10+ with `venv`
+- Docker Engine 24+
+- Python 3.11 with `venv`
+- Containerlab 0.71.0 with the `linux` kind for FRR
+- Ansible Core 2.21.4
+- pyATS/Genie 26.8
 
 ```bash
 # 1. Clone repository
 git clone https://github.com/Realms4239/isp-network-as-code.git
 cd isp-network-as-code
 
-# 2. Deploy virtual network topology
-sudo clab deploy -t topology/topology.clab.yml
-
-# 3. Apply configurations via Ansible
-cd ansible
-ansible-playbook -i inventories/hosts.ini site.yml
-
-# 4. Verify idempotency (should show changed=0)
-ansible-playbook -i inventories/hosts.ini site.yml
-
-# 5. Run pyATS automated tests
-cd ../pyats
+# 2. Install dependencies and run the guarded lifecycle
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
-pyats run job test_job.py --testbed-file testbed.yml
-
-# 6. Destroy lab
-sudo clab destroy -t ../topology/topology.clab.yml
+python -m pip install --requirement pyats/requirements.txt
+export SRL_PASSWORD='<set-in-your-environment>'
+bash ./scripts/run_local.sh
 ```
 
 ---
@@ -97,9 +106,23 @@ sudo clab destroy -t ../topology/topology.clab.yml
 ## 🔬 CI/CD Pipeline Stages
 
 Every push triggers GitHub Actions (`.github/workflows/pipeline.yml`):
-1. **Lint**: YAML lint, Ansible lint, Flake8 python test validation.
-2. **Deploy**: Containerlab deploys SR Linux and FRR nodes in a runner container.
-3. **Configure**: Ansible pushes baseline network configurations.
-4. **Idempotency Gate**: Ansible re-runs; fails pipeline if any tasks produce changes.
-5. **pyATS Validation**: Automated test suites assert protocol state and fail fast if reachability or BGP drops.
-6. **Telemetry & Teardown**: Export Prometheus metrics, take test artifacts snapshot, and teardown.
+1. **Static gates**: cross-file contract validation, negative contract tests, YAML lint, Ansible lint, Python lint, and unit tests.
+2. **Deploy**: Containerlab 0.71.0 starts the pinned SR Linux 24.10.1 and FRR 10.7.1 topology.
+3. **Configure**: Ansible applies a validated candidate configuration and persists it.
+4. **Idempotency Gate**: the JSON callback result requires zero failed/unreachable hosts and exactly zero changes on the second run.
+5. **pyATS Validation**: exact interface, OSPF, BGP, route, and bidirectional reachability assertions run against the live lab.
+6. **Diagnostics & Teardown**: inspect state, logs, Ansible output, and Docker state are uploaded; topology teardown runs with `if: always()`.
+
+The local runner uses the same lifecycle and emits artifacts under `artifacts/` in the repository checkout. Only redacted evidence is suitable for sharing.
+
+## Contract and runtime gates
+
+`data/lab.yml` is the declarative source of truth for node types, management addresses, links, host variables, and pyATS expectations. `scripts/validate_contract.py` verifies every projection against that plan; see `docs/EXTENDING.md` before adding a node or node type.
+
+`scripts/check_ansible_result.py` consumes the Ansible JSON callback rather than parsing recap text. The second run must report `changed=0`, `failed=0`, and `unreachable=0` for every expected host summary, aggregating all plays for each host.
+
+The pinned FRR image is a Containerlab SSH-capable image running through the `linux` kind, with `/etc/frr/daemons` and `/etc/frr/vtysh.conf` supplied by the topology. The runner creates a short-lived host key and writes only the public key into the lab bind directory; Ansible/pyATS use the private key directly.
+
+## Credentials
+
+Do not use the historical default SR Linux password in an untrusted environment. Export `SRL_PASSWORD` and, optionally, `FRR_SSH_KEY` before running locally. GitHub Actions reads `SRL_PASSWORD` from repository secrets. The FRR private key is ephemeral and is never committed.

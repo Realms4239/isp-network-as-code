@@ -33,24 +33,27 @@ The GitHub Actions workflow (`.github/workflows/pipeline.yml`) executes the foll
 
 ```
 [Lint Stage]
+  │── Cross-file contract validator and negative tests
   │── yamllint (validates YAML schema across topology/ and ansible/)
   │── ansible-lint (enforces idempotency and best practices)
   └── flake8 (ensures pyATS test script hygiene)
        │
 [Execution Stage (Free Ubuntu 22.04 Runner)]
-  │── Install Containerlab binary
-  │── Deploy Containerlab topology (Nokia SR Linux + FRR containers)
-  │── Ansible Run 1: Apply baseline configurations
-  │── Ansible Run 2: Verify idempotency (assert changed=0, failed=0)
-  │── pyATS Run: Execute automated test suite (asserts protocol states & reachability)
-  └── Teardown: Clean up containers and virtual interfaces
+  │── Install pinned Containerlab, Python, and Ansible dependencies
+  │── Deploy Containerlab topology (Nokia SR Linux + SSH-capable FRR image)
+  │── Ansible Run 1: Apply and persist baseline configurations
+  │── Ansible Run 2: Parse JSON callback; require changed=0, failed=0, unreachable=0
+  │── pyATS Run: Assert interfaces, OSPF FULL, exact BGP peers, routes, and bidirectional ping
+  ├── Collect inspect state, logs, and machine-readable Ansible output on failure
+  └── Teardown with if: always(): clean up containers and virtual interfaces
 ```
 
 ---
 
 ## 3. pyATS Test Assertions
 
-1. `InterfaceOperationalCheck`: Checks interface operational status.
-2. `OSPFAdjacencyCheck`: Checks OSPF neighbor table for `Full` adjacency between core nodes.
-3. `BGPPeeringCheck`: Confirms BGP peers reach `Established` state and prefixes are exchanged.
-4. `EndToEndReachabilityCheck`: Performs bidirectional ping validation between nodes across the fabric.
+1. `InterfaceOperationalCheck`: Requires `ethernet-1/1`, `ethernet-1/2`, and `system0` to be admin-enabled and operationally up.
+2. `OSPFAdjacencyCheck`: Requires the exact core router ID and `full` state on each SR Linux node.
+3. `BGPPeeringCheck`: Requires the exact SR Linux and FRR peer sets, AS numbers, `Established` state, and nonzero prefix counts.
+4. `RouteInstallationCheck`: Looks up each remote loopback in the SR Linux route table and records FRR route evidence.
+5. `EndToEndReachabilityCheck`: Performs bidirectional ping validation for all three node pairs.

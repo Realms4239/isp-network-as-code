@@ -1,7 +1,7 @@
-pyats>=24.1
-genie>=24.1
-ansible>=8.0.0
-ansible-pylibssh>=1.1.0
-yamllint>=1.33.0
-pytest>=7.4.0
-requests>=2.31.0
+pyats==26.8
+genie==26.8
+ansible-core==2.21.4
+ansible-pylibssh==1.4.0
+yamllint==1.38.0
+pytest==9.1.1
+requests==2.34.2

@@ -20,10 +20,10 @@ from parsers import (  # noqa: E402
     frr_bgp_peers,
     frr_peer_is_healthy,
     ping_succeeded,
-    prefix_present,
     srl_bgp_peer_established,
     srl_interface_is_up,
     srl_ospf_neighbor_is_full,
+    srl_route_is_installed,
 )
 
 # --- fixtures modelled on real vendor output ------------------------------
@@ -87,6 +87,28 @@ SRL_BGP_ACTIVE = """
     Peer : 10.1.13.2, remote AS : 65002, description : eBGP to FRR01
     BGP state : Active, ...
     session-state is active
+"""
+
+# `show network-instance default route-table ipv4-unicast prefix <p> detail`
+# echoes the queried command, so the prefix ALWAYS appears in the output. That
+# is the whole point of the fixtures below: an installed route and a missing
+# route both contain the prefix string.
+SRL_ROUTE_INSTALLED = """
+{ "command": "show network-instance default route-table ipv4-unicast prefix 10.0.0.2/32 detail" }
++-------------------------+-------------+----------+-------+------------------+-------+
+| Prefix                 | Next-hop    | Metric   | Type  | Protocol         | Active|
++-------------------------+-------------+----------+-------+------------------+-------+
+| 10.0.0.2/32             | 10.1.12.2   | 110      | unicast| ospf            | true  |
++-------------------------+-------------+----------+-------+------------------+-------+
+"""
+
+# Same echoed command, no route. The old substring check passed on this.
+SRL_ROUTE_MISSING = """
+{ "command": "show network-instance default route-table ipv4-unicast prefix 10.0.0.2/32 detail" }
++-------------------------+-------------+----------+-------+------------------+-------+
+| Prefix                 | Next-hop    | Metric   | Type  | Protocol         | Active|
++-------------------------+-------------+----------+-------+------------------+-------+
+No entries found.
 """
 
 # Real FRR 10.x `show ip bgp summary json`: peers are nested under ipv4Unicast.
@@ -245,12 +267,46 @@ def test_frr_non_numeric_counters_do_not_raise():
 
 # --- routes and reachability ---------------------------------------------
 
-def test_prefix_present_finds_an_installed_route():
-    assert prefix_present("10.0.0.2/32  unicast  via 10.1.12.2", "10.0.0.2/32")
+def test_installed_srl_route_is_reported_installed():
+    ok, reasons = srl_route_is_installed(SRL_ROUTE_INSTALLED, "10.0.0.2/32")
+    assert ok, reasons
 
 
-def test_prefix_absent_is_reported():
-    assert not prefix_present("no routes", "10.0.0.2/32")
+def test_missing_srl_route_is_reported_missing_even_though_the_prefix_is_echoed():
+    """The defect: the command line is echoed, so a substring test cannot fail.
+
+    The old `prefix_present` returned True here because the echoed command
+    contains the prefix. This is the case the assertion existed to catch.
+    """
+    assert "10.0.0.2/32" in SRL_ROUTE_MISSING, "precondition: prefix is echoed"
+    # The removed `prefix_present` returned True here, because the echoed
+    # command contains the prefix. Asserted as a precondition so the reason
+    # this check exists stays visible.
+    assert SRL_ROUTE_MISSING.count("10.0.0.2/32") >= 1
+
+    ok, reasons = srl_route_is_installed(SRL_ROUTE_MISSING, "10.0.0.2/32")
+    assert not ok
+    assert reasons
+
+
+def test_srl_route_check_rejects_empty_device_output():
+    ok, reasons = srl_route_is_installed("", "10.0.0.2/32")
+    assert not ok
+    assert "no output" in reasons[0]
+
+
+def test_srl_route_check_reports_what_it_saw():
+    """A failure must be diagnosable, not just false."""
+    output = '{ "command": "show ... prefix 10.0.0.2/32 detail" }\nnothing here\n'
+    ok, reasons = srl_route_is_installed(output, "10.0.0.2/32")
+    assert not ok
+    assert "10.0.0.2/32" in reasons[0], reasons
+
+
+def test_srl_route_check_ignores_a_different_prefix():
+    """A route for another prefix must not satisfy the query."""
+    ok, _ = srl_route_is_installed(SRL_ROUTE_INSTALLED, "10.0.0.9/32")
+    assert not ok
 
 
 def test_ping_srl_style_summary():

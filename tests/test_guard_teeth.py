@@ -5,6 +5,7 @@ reintroduces the original defect in a scratch copy and asserts the check fires.
 """
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -144,3 +145,47 @@ def test_offline_suite_does_not_import_pyats():
                     offenders.append(f"{path.name}:{number}: {stripped}")
 
     assert not offenders, "offline tests must not import pyATS: " + "; ".join(offenders)
+
+
+def test_no_route_assertion_uses_a_bare_substring_check():
+    """A route assertion must not reduce to `prefix in output`.
+
+    `show ... prefix <p> detail` echoes the command line, which contains the
+    prefix. So a substring test is True for a prefix with no route installed,
+    and the assertion cannot fail. This exact defect shipped once: the FRR
+    path was fixed and the SR Linux path was left calling the same helper.
+
+    Both paths must now go through a real check, so ban the bare form outright
+    rather than trusting a reviewer to notice a new one.
+    """
+    source = (ROOT / "pyats" / "test_network.py").read_text("utf-8")
+
+    # Only assert statements count. `for prefix in prefixes` is a loop, and the
+    # explanatory comment quotes the bad form on purpose; flagging either would
+    # make the guard cry wolf on correct code.
+    offenders = [
+        f"{number}: {line.strip()}"
+        for number, line in enumerate(source.splitlines(), 1)
+        if re.search(r"\bassert\b", line)
+        and re.search(r"\b\w*[Pp]refix\w*\s+in\s+\w+", line)
+    ]
+    assert not offenders, (
+        "route assertions must not use a substring presence check: "
+        + "; ".join(offenders)
+    )
+
+
+def test_route_helpers_are_imported_not_reimplemented():
+    """test_network.py must call the tested helpers, not inline its own logic.
+
+    A second copy of the parsing logic in the test file is a second thing that
+    can be wrong and is not covered by the offline parser suite.
+    """
+    source = (ROOT / "pyats" / "test_network.py").read_text("utf-8")
+
+    # json is legitimately used for the FRR JSON route check.
+    inline_json = re.findall(r"json\.loads\(", source)
+    for helper in ("srl_route_is_installed", "frr_bgp_peers", "ping_succeeded"):
+        assert f"    {helper}," in source, f"{helper} must be imported from parsers"
+    # Only the FRR route check may parse JSON, and it is asserted inline.
+    assert len(inline_json) <= 1, "unexpected extra JSON parsing in the test file"

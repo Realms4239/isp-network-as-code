@@ -15,10 +15,10 @@ from parsers import (
     frr_bgp_peers,
     frr_peer_is_healthy,
     ping_succeeded,
-    prefix_present,
     srl_bgp_peer_established,
     srl_interface_is_up,
     srl_ospf_neighbor_is_full,
+    srl_route_is_installed,
 )
 
 log = logging.getLogger(__name__)
@@ -135,8 +135,12 @@ class RouteInstallationCheck(aetest.Testcase):
                     f"prefix {prefix} detail"
                 )
                 log.info(f"Route {prefix} on {dev_name}:\n{output}")
-                assert prefix_present(output, prefix), (
-                    f"Missing route {prefix} on {dev_name}"
+                # The command line itself contains the prefix, so a substring
+                # test would pass even with no route installed. Require a real
+                # route row; this mirrors the FRR check below.
+                ok, reasons = srl_route_is_installed(output, prefix)
+                assert ok, (
+                    f"Missing route {prefix} on {dev_name}: {'; '.join(reasons)}"
                 )
 
     @aetest.test

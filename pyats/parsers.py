@@ -110,9 +110,45 @@ def frr_peer_is_healthy(peer: dict) -> tuple:
 
 # --- routes and reachability ---------------------------------------------
 
-def prefix_present(route_text: str, prefix: str) -> bool:
-    """True when `prefix` appears in route output (SR Linux or vtysh)."""
-    return prefix in route_text
+
+def srl_route_is_installed(output: str, prefix: str) -> tuple:
+    """Return (ok, reasons) for `show ... prefix <prefix> detail` output.
+
+    Why this is not a substring test. The command line itself contains the
+    prefix, and SR Linux echoes the query back before the table. So
+    `prefix in output` is true for a prefix that has NO route installed, which
+    makes the assertion unable to fail. The FRR path above already learned this
+    and requires a real route entry; this is the same reasoning for the
+    vendor-CLI side.
+
+    A real answer contains a table row: the prefix followed by a next hop, or
+    the word `active`/`resolved` in the entry. An empty table renders as
+    "No entries found" or a header with no data rows.
+
+    Returns (ok, reasons) so the caller can report what was actually seen.
+    """
+    if not output.strip():
+        return (False, ["device returned no output"])
+
+    if re.search(r"no\s+(?:entries|routes|matches)\s+found", output, re.IGNORECASE):
+        return (False, ["device reported no entries found"])
+
+    # Work line by line. A table row starts (after optional decoration) with
+    # the prefix and carries a next hop or an explicit active/resolved marker.
+    # Requiring that marker is what separates a real route row from the echoed
+    # command line and the header row, both of which contain the prefix.
+    for line in output.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("|"):
+            stripped = stripped[1:].strip()
+        if not stripped.startswith(prefix):
+            continue
+        remainder = stripped[len(prefix):]
+        if re.search(r"\b(?:\d+\.\d+\.\d+\.\d+|active|resolved)\b", remainder, re.IGNORECASE):
+            return (True, [])
+
+    head = " ".join(output.split())[:120]
+    return (False, [f"no route row for {prefix} (saw: {head!r})"])
 
 
 def ping_succeeded(output: str) -> bool:

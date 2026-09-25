@@ -108,6 +108,16 @@ The lab password is never committed; see [docs/EVIDENCE.md](docs/EVIDENCE.md).
 - Ansible Core 2.21.4
 - pyATS/Genie 26.8
 
+> **Why Linux, concretely:** pyATS 26.8 and Genie 26.8 publish wheels for
+> Linux and macOS only. There is no Windows wheel, so on a native Windows
+> host `pip install -r pyats/requirements.txt` fails with
+> `Could not find a version that satisfies the requirement pyats==26.8
+> (from versions: none)` even when the network is fine and the version
+> definitely exists. That message reads like an outage or a typo, and it is
+> neither. The offline test suite does not need pyATS, so it still runs on
+> Windows; only the live lab and `pyats/` do not. Use WSL2, a Linux VM, or
+> Linux CI.
+
 ```bash
 # 1. Clone repository
 git clone https://github.com/Realms4239/isp-network-as-code.git

@@ -99,3 +99,48 @@ def test_testbed_must_list_every_planned_node():
     plan = yaml.safe_load((ROOT / "data/lab.yml").read_text("utf-8"))
     testbed = yaml.safe_load((ROOT / "pyats/testbed.yml").read_text("utf-8"))
     assert set(testbed["devices"]) == set(plan["nodes"]) == set(PLAN_NODES)
+
+
+def test_readme_explains_why_windows_cannot_run_the_live_lab():
+    """The Linux requirement must state the reason, not just assert it.
+
+    pyATS and Genie publish no Windows wheels. On a native Windows host pip
+    reports `from versions: none` for a version that genuinely exists, which
+    reads like an outage or a typo in the pin. A reader who does not know the
+    wheel situation burns time chasing a network problem that isn't there, so
+    the README has to carry the explanation.
+    """
+    readme = (ROOT / "README.md").read_text("utf-8")
+
+    assert "Why Linux" in readme, "README must explain the Linux requirement"
+    for token in ("pyATS", "Windows", "from versions: none"):
+        assert token in readme, f"README platform note is missing {token!r}"
+
+
+def test_offline_suite_does_not_import_pyats():
+    """Offline tests must stay runnable without pyATS installed.
+
+    This suite is the authoritative gate and runs on any host. If an offline
+    test imported pyats, the whole gate would collapse on exactly the machines
+    that cannot install it (Windows, and any host before the wheel is cached).
+    """
+    banned = ("pyats", "genie", "unstructured")
+    offenders: list[str] = []
+    for path in sorted((ROOT / "tests").glob("*.py")):
+        for number, line in enumerate(path.read_text("utf-8").splitlines(), 1):
+            stripped = line.strip()
+            if not stripped.startswith(("import ", "from ")):
+                continue
+            # Match the module and any submodule. An exact match on the bare
+            # name is not enough: `import pyats.testbed` is a real pyATS
+            # dependency and slipped past the first version of this check.
+            if stripped.startswith("from "):
+                module = stripped[len("from "):].split(" ")[0].strip()
+            else:
+                module = stripped[len("import "):].split(" ")[0].strip().rstrip(",")
+            for banned_name in banned:
+                root = module.split(".")[0]
+                if root == banned_name:
+                    offenders.append(f"{path.name}:{number}: {stripped}")
+
+    assert not offenders, "offline tests must not import pyATS: " + "; ".join(offenders)

@@ -11,6 +11,7 @@ All notable changes to this project are documented here. The format follows Keep
 - Redacted evidence collection, stage events, and SHA-256 artifact manifests.
 - Plan-driven SR Linux readiness probing.
 - Offline negative-contract tests for drift, malformed inputs, security boundaries, and result-gate failures.
+- Two platform guards: the README must explain *why* Windows cannot run the live lab, and the offline suite must not import pyATS.
 - Contributor, security, code-of-conduct, issue, and pull-request governance files.
 
 ### Changed
@@ -42,11 +43,12 @@ All notable changes to this project are documented here. The format follows Keep
 - The single opaque lint step is split into named YAML / Ansible / Python steps, and each reports its effective config or limit on failure, so a red step names its own cause.
 - Added `.ansible-lint` (production profile, `offline: true`, documented `skip_list`).
 - Added an offline "Verify Ansible can resolve the installed collections" step (`ansible-config dump`, collection list, `--syntax-check`) ahead of linting.
-- Offline tests grew 42 → 88. New guards: role-vars shape, candidate contract, role variable prefixes, `collections_path`, testbed matches the plan, testbed credentials via `%ENV{}`, and a mechanical ban on inline `re.search` in `test_network.py`. `tests/test_guard_teeth.py` reintroduces each past defect and asserts the guard still fires.
+- Offline tests grew 42 → 90. New guards: role-vars shape, candidate contract, role variable prefixes, `collections_path`, testbed matches the plan, testbed credentials via `%ENV{}`, a mechanical ban on inline `re.search` in `test_network.py`, the README platform rationale, and a ban on importing pyATS from offline tests. `tests/test_guard_teeth.py` reintroduces each past defect and asserts the guard still fires.
 - CI flake8 target widened to `pyats/*.py` so the new module is linted.
 - README states the real Python floor (3.12+) and explains the two-job split.
 
 ### Known limitations
 
-- Live Containerlab, Ansible, and pyATS verification requires a Linux/Docker host, cached images, and `SRL_PASSWORD`. It has never completed a passing run; the offline gates are the only green evidence so far. Everything that can be proven without a lab is now covered by 88 offline tests, but the assertions have still never been executed against real devices.
+- Live Containerlab, Ansible, and pyATS verification requires a Linux/Docker host, cached images, and `SRL_PASSWORD`. It has never completed a passing run; the offline gates are the only green evidence so far. Everything that can be proven without a lab is now covered by 90 offline tests, but the assertions have still never been executed against real devices.
+- **pyATS and Genie 26.8 ship no Windows wheels** (Linux and macOS only). On a native Windows host `pip install -r pyats/requirements.txt` fails with `Could not find a version that satisfies the requirement pyats==26.8 (from versions: none)` even though 26.8 exists and the network is healthy — pip is filtering on wheel tags, not failing to reach the index. The message misattributes a platform limitation to the network. The offline suite does not need pyATS and still runs on Windows (verified: 90 passed); the live lab needs WSL2, a Linux VM, or Linux CI.
 - The project does not rewrite Git history automatically when a credential has previously been committed.

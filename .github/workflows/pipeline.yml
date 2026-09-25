@@ -83,11 +83,19 @@ jobs:
         env:
           ANSIBLE_CONFIG: ${{ github.workspace }}/ansible/ansible.cfg
           ANSIBLE_COLLECTIONS_PATH: ${{ github.workspace }}/ansible/collections
-        run: ansible-lint site.yml
+        # .ansible-lint lives at the repository root, one level above this
+        # working directory, so name it explicitly. Without this the step falls
+        # back to ansible-lint's strict defaults and fails on rules this lab
+        # declares as intentional in data/lab.yml.
+        run: |
+          ansible-lint --config "${GITHUB_WORKSPACE}/.ansible-lint" site.yml \
+            || { echo "--- ansible-lint failed; config in effect: ---"; cat "${GITHUB_WORKSPACE}/.ansible-lint"; exit 1; }
 
       - name: Lint Python
         run: |
-          flake8 pyats/test_network.py pyats/test_job.py scripts/*.py ansible/plugins/callback/*.py tests/*.py --max-line-length=120
+          # shellcheck disable=SC2086
+          flake8 pyats/test_network.py pyats/test_job.py scripts/*.py ansible/plugins/callback/*.py tests/*.py --max-line-length=120 \
+            || { echo "--- flake8 failed (line length 120, per pyproject.toml) ---"; exit 1; }
 
   deploy-and-validate:
     name: Containerlab, Ansible, and pyATS Verification

@@ -63,13 +63,20 @@ jobs:
 
       - name: Lint YAML
         run: |
-          # `-f parsable` makes the first failing line the headline instead of a
-          # generic non-zero exit, so a config problem is visible in the log
-          # rather than inferred.
+          # ansible/collections/ is populated by the previous step from Galaxy and
+          # is third-party code we neither own nor can restyle. Linting it made
+          # this step fail on upstream formatting while every tracked file passed.
           yamllint -f parsable \
-            data/ topology/ ansible/ observability/ pyats/ \
+            data/ topology/ observability/ pyats/ \
             .github/workflows/pipeline.yml .github/ISSUE_TEMPLATE/ .github/dependabot.yml \
             || { echo "--- yamllint failed; effective config: .yamllint ---"; cat .yamllint; exit 1; }
+          # Lint only the hand-written Ansible YAML, not downloaded collections.
+          # ansible.cfg is INI, not YAML, so it is deliberately absent here.
+          yamllint -f parsable \
+            ansible/site.yml ansible/requirements.yml \
+            ansible/group_vars ansible/host_vars ansible/inventories \
+            ansible/roles ansible/plugins \
+            || { echo "--- yamllint failed on ansible sources ---"; exit 1; }
 
       - name: Lint Ansible
         working-directory: ansible

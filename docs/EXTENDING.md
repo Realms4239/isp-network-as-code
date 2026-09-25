@@ -27,7 +27,7 @@ Offline gates must always pass before a live run:
 python scripts/validate_contract.py
 python -m pytest -q tests
 yamllint data/ topology/ ansible/ observability/ pyats/ .github/workflows/pipeline.yml .github/ISSUE_TEMPLATE/ .github/dependabot.yml
-flake8 pyats/test_network.py pyats/test_job.py scripts/*.py ansible/plugins/callback/*.py tests/*.py --max-line-length=120
+flake8 pyats/*.py scripts/*.py ansible/plugins/callback/*.py tests/*.py --max-line-length=120
 ```
 
 ## Evidence and security
@@ -66,6 +66,30 @@ Do not publish a release with an unredacted credential, private key, or customer
 - Use explicit failure messages; do not rely on human interpretation of CI output.
 - Do not make idempotency depend on a recap line or on the last play for a host. `scripts/check_ansible_result.py` aggregates all host statistics.
 - Do not embed credentials in the plan, topology, inventory, or documentation.
+
+## 6. Add or change a pyATS assertion
+
+Never write an inline `re.search` against device output in
+`pyats/test_network.py`. Assertions there are unreachable without a live lab,
+which is how three real defects survived: the FRR peer map was read from the
+wrong JSON level, one peer's output was asserted against every peer, and the
+route check passed whenever vtysh echoed the queried prefix back.
+
+Instead:
+
+1. Add a pure function to `pyats/parsers.py` that takes output text and returns
+   a verdict.
+2. Cover it in `tests/test_pyats_parsers.py` with a fixture modelled on real
+   vendor output, including at least one negative case.
+3. Call it from `test_network.py` and turn the verdict into an assertion whose
+   message names the device and the value.
+
+`tests/test_contract.py::test_pyats_suite_has_no_bare_regex_assertions` enforces
+this mechanically, so an inline regex fails the build.
+
+`test_guard_teeth.py` exists for the same reason in the other direction: it
+reintroduces each past defect and asserts the guard still fires, because a guard
+that cannot fail is worse than no guard.
 
 ## Offline versus live verification
 

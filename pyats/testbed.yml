@@ -1,4 +1,18 @@
 ---
+# pyATS testbed for the Phase 0 ISP backbone.
+#
+# Device notes:
+#   - `type` is only a model label in pyATS (there is no registry to satisfy),
+#     but SR Linux and FRR are not Genie-supported platforms, so no Genie parser
+#     can be attached. Every assertion in test_network.py therefore treats CLI
+#     output as text via pyats/parsers.py.
+#   - `connections.defaults.class` must be an importable Unicon connection
+#     class. The plain `unicon.Unicon` is kept deliberately: it speaks SSH and
+#     issues commands, which is all the assertions need, and it avoids
+#     depending on vendor-specific Unicon plugins for platforms pyATS does not
+#     model. Device-specific command sets live in the test script, not here.
+#   - `os: linux` is the closest accurate model for both node families: SR Linux
+#     is a Linux-based NOS and FRR runs in a Linux container.
 testbed:
   name: isp-backbone-testbed
   credentials:

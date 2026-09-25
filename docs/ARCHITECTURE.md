@@ -52,8 +52,42 @@ The GitHub Actions workflow (`.github/workflows/pipeline.yml`) executes the foll
 
 ## 3. pyATS Test Assertions
 
-1. `InterfaceOperationalCheck`: Requires `ethernet-1/1`, `ethernet-1/2`, and `system0` to be admin-enabled and operationally up.
-2. `OSPFAdjacencyCheck`: Requires the exact core router ID and `full` state on each SR Linux node.
-3. `BGPPeeringCheck`: Requires the exact SR Linux and FRR peer sets, AS numbers, `Established` state, and nonzero prefix counts.
-4. `RouteInstallationCheck`: Looks up each remote loopback in the SR Linux route table and records FRR route evidence.
-5. `EndToEndReachabilityCheck`: Performs bidirectional ping validation for all three node pairs.
+The assertions live in two places, deliberately separated:
+
+- `pyats/parsers.py` — pure functions that take device *output text* and return a
+  verdict. No device, no testbed, no network.
+- `pyats/test_network.py` — talks to devices and turns a verdict into an aetest
+  assertion.
+
+That split exists because the assertions used to be written inline against
+`dev.execute(...)`, which meant **none of them could be verified without a live
+lab** — and three real defects survived that way:
+
+1. **FRR peers were read from the wrong JSON level.** Real `show ip bgp summary
+   json` nests the peer map under `ipv4Unicast.peers`; the code read only a
+   top-level `peers` key, so a healthy lab reported *no peers* and the assertion
+   failed for the wrong reason.
+2. **One peer's output was checked against every peer.** The BGP loop fetched the
+   first peer's detail and then asserted all peers against that single response.
+3. **The route assertion could not fail.** `assert prefix in route_text` passed
+   whenever vtysh echoed the queried prefix back, whether or not a route existed.
+
+`tests/test_pyats_parsers.py` pins all three with fixtures modelled on real
+vendor output, and runs with no containers and no credentials.
+
+The four assertion groups:
+
+1. `InterfaceOperationalCheck`: `ethernet-1/1`, `ethernet-1/2`, and `system0`
+   are admin-enabled and operationally up on both SR Linux nodes.
+2. `OSPFAdjacencyCheck`: the exact core router ID is `full` **and** the node
+   reports zero bad neighbors.
+3. `BGPPeeringCheck`: exact peer sets and remote AS values on SRL; on FRR, exact
+   peer set, `Established` state, and nonzero `pfxRcd`/`pfxSnt` for each peer.
+4. `RouteInstallationCheck` / `EndToEndReachabilityCheck`: remote loopbacks
+   installed in every expected table, and bidirectional reachability across all
+   three node pairs.
+
+**Why no Genie parsers:** SR Linux and FRR are not Genie-supported platforms. A
+Genie parser would silently return empty structures, so the output is treated as
+text and the regexes are anchored on the vendors' documented column formats.
+

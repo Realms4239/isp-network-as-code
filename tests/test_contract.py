@@ -176,6 +176,71 @@ def test_role_prefixed_variables_only():
             )
 
 
+def test_testbed_matches_the_plan_and_the_pyats_expectations():
+    """The testbed is only useful if it points at the devices the plan declares.
+
+    Nothing else in the offline suite can catch a testbed that still names the
+    old management addresses, because a wrong testbed only fails once the live
+    lab tries to connect.
+    """
+    plan = load_yaml(ROOT / "data" / "lab.yml")
+    testbed = load_yaml(ROOT / "pyats" / "testbed.yml")
+    devices = testbed["devices"]
+    assert set(devices) == set(plan["nodes"]), (
+        f"testbed devices {sorted(devices)} do not match plan nodes "
+        f"{sorted(plan['nodes'])}"
+    )
+    for name, node in plan["nodes"].items():
+        connections = devices[name]["connections"]
+        ips = {
+            conn["ip"]
+            for block in connections.values()
+            if isinstance(block, dict)
+            for conn in ([block] if "ip" in block else block.values())
+            if isinstance(conn, dict) and "ip" in conn
+        }
+        assert node["mgmt_ipv4"] in ips, (
+            f"testbed {name} does not point at the planned management address "
+            f"{node['mgmt_ipv4']}"
+        )
+
+
+def test_testbed_credentials_come_from_the_environment():
+    """No literal credential may appear in the testbed."""
+    raw = (ROOT / "pyats" / "testbed.yml").read_text(encoding="utf-8")
+    for line in raw.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#") or ":" not in stripped:
+            continue
+        key, _, value = stripped.partition(":")
+        if key.strip() not in ("username", "password", "private_key"):
+            continue
+        assert "%ENV{" in value, (
+            f"testbed credential {key.strip()!r} must come from %ENV{{...}}, "
+            f"got {value.strip()!r}"
+        )
+
+
+def test_pyats_suite_has_no_bare_regex_assertions():
+    """Parsing must live in pyats/parsers.py so it stays offline-testable.
+
+    An inline re.search against device output cannot be verified without a live
+    lab, which is how two real defects survived in this file.
+    """
+    source = (ROOT / "pyats" / "test_network.py").read_text(encoding="utf-8")
+    body = "\n".join(
+        line for line in source.splitlines() if not line.strip().startswith("#")
+    )
+    assert "import re" not in body, (
+        "test_network.py must not parse output itself; import the helpers from "
+        "parsers.py so the logic is covered by tests/test_pyats_parsers.py"
+    )
+    assert "re.search" not in body, (
+        "inline re.search against device output is not offline-testable; add a "
+        "helper in pyats/parsers.py and cover it there"
+    )
+
+
 def test_ansible_cfg_does_not_pin_collections_path():
     """collections_path in ansible.cfg overrides ANSIBLE_COLLECTIONS_PATH.
 

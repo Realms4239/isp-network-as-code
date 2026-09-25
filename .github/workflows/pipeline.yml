@@ -50,14 +50,19 @@ jobs:
           python scripts/validate_contract.py
           python -m pytest -q tests
 
-      - name: Lint YAML, Ansible, and Python
+      - name: Lint YAML
         run: |
           yamllint data/ topology/ ansible/ observability/ pyats/ .github/workflows/pipeline.yml .github/ISSUE_TEMPLATE/ .github/dependabot.yml
-          cd ansible
-          ANSIBLE_CONFIG="${GITHUB_WORKSPACE}/ansible/ansible.cfg" \
-          ANSIBLE_COLLECTIONS_PATH="${GITHUB_WORKSPACE}/ansible/collections" \
-          ansible-lint site.yml
-          cd ..
+
+      - name: Lint Ansible
+        working-directory: ansible
+        env:
+          ANSIBLE_CONFIG: ${{ github.workspace }}/ansible/ansible.cfg
+          ANSIBLE_COLLECTIONS_PATH: ${{ github.workspace }}/ansible/collections
+        run: ansible-lint site.yml
+
+      - name: Lint Python
+        run: |
           flake8 pyats/test_network.py pyats/test_job.py scripts/*.py ansible/plugins/callback/*.py tests/*.py --max-line-length=120
 
   deploy-and-validate:

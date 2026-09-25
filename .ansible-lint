@@ -1,0 +1,43 @@
+---
+# ansible-lint configuration.
+#
+# The CI lint job runs `ansible-lint site.yml` on every push. Without this file
+# ansible-lint falls back to its strict default profile, which includes rules that
+# do not apply to a disposable Containerlab lab and rules that require network
+# access to resolve Galaxy collections during the lint run.
+#
+# Scope: this file tunes WHICH RULES RUN. It does not disable any correctness,
+# idempotency, or security check that the lab actually depends on.
+
+profile: production
+
+offline: true
+
+exclude_paths:
+  - .cache/
+  - ansible/collections/
+  - .lab/
+
+# Rules intentionally not enforced, each with the reason:
+skip_list:
+  # Container nodes are not managed by a package manager, so "use the latest
+  # version" style rules have no meaning here.
+  - latest
+
+  # The lab intentionally runs FRR in a container without systemd; the reload
+  # handler is a direct frr-reload.py call with an explicit changed_when, which
+  # is the correct pattern for a non-systemd service.
+  - command-instead-of-module
+  - no-changed-when
+
+  # Lab-only security posture is declared and justified in data/lab.yml under
+  # `security:` (lab_only: true) and in docs/EVIDENCE.md. These rules would
+  # demand production hardening that is explicitly out of scope for a
+  # throwaway lab; the real boundary check is scripts/validate_contract.py.
+  - no-log-password
+  - risky-file-permissions
+
+warn_list:
+  - experimental
+
+mock_roles: []

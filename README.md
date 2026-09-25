@@ -65,7 +65,7 @@ The lab password is never committed; see [docs/EVIDENCE.md](docs/EVIDENCE.md).
 - **Data and contract**: `data/lab.yml` is the declarative plan; `scripts/validate_contract.py` checks every projection against it.
 - **Topology**: `topology/topology.clab.yml` is the Containerlab projection.
 - **Configuration**: `ansible/` contains inventory, group variables, host variables, and role-specific protocol configuration.
-- **Verification**: `pyats/` contains the testbed, job, and protocol/data-plane assertions.
+- **Verification**: `pyats/parsers.py` holds pure output parsers, `pyats/test_job.py` the job entry point, `pyats/testbed.yml` the device map, and `pyats/test_network.py` the assertions. Parsing is deliberately separated from device I/O so that all of it is covered by offline tests — see [docs/EXTENDING.md](docs/EXTENDING.md).
 - **Operations**: `scripts/` contains preparation, local lifecycle, contract validation, and result validation.
 - **CI**: `.github/workflows/pipeline.yml` runs offline quality gates before the live lab stage.
 

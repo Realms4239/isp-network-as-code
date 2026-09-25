@@ -12,7 +12,7 @@
 
 ---
 
-## 🎯 Architecture & Overview
+## ðŸŽ¯ Architecture & Overview
 
 Network engineers at ISPs traditionally configure routers by hand over SSH. Human mistakes surface during customer outages, not before deployment. 
 
@@ -40,7 +40,7 @@ Network engineers at ISPs traditionally configure routers by hand over SSH. Huma
 - [Evidence contract](docs/EVIDENCE.md)
 - [Extension guide](docs/EXTENDING.md)
 
-## 🗂️ Repository Map
+## ðŸ—‚ï¸ Repository Map
 
 - **Data and contract**: `data/lab.yml` is the declarative plan; `scripts/validate_contract.py` checks every projection against it.
 - **Topology**: `topology/topology.clab.yml` is the Containerlab projection.
@@ -49,7 +49,7 @@ Network engineers at ISPs traditionally configure routers by hand over SSH. Huma
 - **Operations**: `scripts/` contains preparation, local lifecycle, contract validation, and result validation.
 - **CI**: `.github/workflows/pipeline.yml` runs offline quality gates before the live lab stage.
 
-## 📐 Topology Diagram
+## ðŸ“ Topology Diagram
 
 ```
                  +---------------------------------+
@@ -78,12 +78,12 @@ Network engineers at ISPs traditionally configure routers by hand over SSH. Huma
 
 ---
 
-## ⚡ Quick Start (Local Run)
+## âš¡ Quick Start (Local Run)
 
 ### Requirements
 - Linux (Ubuntu 22.04 LTS or Debian 12 recommended) or Linux VM.
 - Docker Engine 24+
-- Python 3.11 with `venv`
+- Python 3.12+ with `venv` (pinned by `ansible-core` 2.21)
 - Containerlab 0.71.0 with the `linux` kind for FRR
 - Ansible Core 2.21.4
 - pyATS/Genie 26.8
@@ -103,7 +103,7 @@ bash ./scripts/run_local.sh
 
 ---
 
-## 🔬 CI/CD Pipeline Stages
+## ðŸ”¬ CI/CD Pipeline Stages
 
 Every push triggers GitHub Actions (`.github/workflows/pipeline.yml`):
 1. **Static gates**: cross-file contract validation, negative contract tests, YAML lint, Ansible lint, Python lint, and unit tests.

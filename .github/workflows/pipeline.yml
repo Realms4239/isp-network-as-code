@@ -63,7 +63,13 @@ jobs:
 
       - name: Lint YAML
         run: |
-          yamllint data/ topology/ ansible/ observability/ pyats/ .github/workflows/pipeline.yml .github/ISSUE_TEMPLATE/ .github/dependabot.yml
+          # `-f parsable` makes the first failing line the headline instead of a
+          # generic non-zero exit, so a config problem is visible in the log
+          # rather than inferred.
+          yamllint -f parsable \
+            data/ topology/ ansible/ observability/ pyats/ \
+            .github/workflows/pipeline.yml .github/ISSUE_TEMPLATE/ .github/dependabot.yml \
+            || { echo "--- yamllint failed; effective config: .yamllint ---"; cat .yamllint; exit 1; }
 
       - name: Lint Ansible
         working-directory: ansible

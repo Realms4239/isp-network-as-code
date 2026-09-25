@@ -30,6 +30,26 @@ Network engineers at ISPs traditionally configure routers by hand over SSH. Huma
 6. **Optional Observability**: Prometheus and Grafana provisioning examples are provided under `observability/`; exporters are not part of the Phase 0 container topology.
 
 ---
+## Two jobs, and what each one proves
+
+| Job | Runs when | Proves |
+|---|---|---|
+| `Code Quality & Contract Validation` | every push and PR | cross-file contract holds, negative tests fail correctly, YAML/Ansible/Python lint clean, Ansible can resolve the pinned collections |
+| `Containerlab, Ansible, and pyATS Verification` | push, same-repo PR, **and only when `SRL_PASSWORD` exists** | the lab actually deploys, converges, and passes protocol assertions |
+
+The first job needs no secrets and no Docker, so it is the authoritative gate and
+it must stay green. The second is optional live proof: it is **skipped, not
+failed**, when the lab credential is absent, because reporting a missing secret
+as a broken lab is a misleading signal. To enable it:
+
+```sh
+gh secret set SRL_PASSWORD --repo Realms4239/isp-network-as-code
+```
+
+The lab password is never committed; see [docs/EVIDENCE.md](docs/EVIDENCE.md).
+
+## Project governance
+
 
 ## Project governance
 

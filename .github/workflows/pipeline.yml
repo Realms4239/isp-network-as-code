@@ -113,7 +113,15 @@ jobs:
 
   deploy-and-validate:
     name: Containerlab, Ansible, and pyATS Verification
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # Runs on pushes and on same-repo pull requests, and only when the lab
+    # credential actually exists. Without SRL_PASSWORD the live stage cannot do
+    # anything useful, and failing deep inside the deploy step with a vendor
+    # error would misreport a missing secret as a broken lab. The `lint` job is
+    # the authoritative gate in every case; this job is the optional live proof.
+    if: >-
+      needs.lint.result == 'success' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+      secrets.SRL_PASSWORD != ''
     runs-on: ubuntu-22.04
     needs: lint
     timeout-minutes: 45

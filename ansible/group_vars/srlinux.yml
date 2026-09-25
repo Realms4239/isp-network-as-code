@@ -1,7 +1,12 @@
 ---
 ansible_user: admin
-ansible_password: admin  # default lab credential
-ansible_connection: network_cli
+ansible_password: "{{ lookup('env', 'SRL_PASSWORD') | default('NokiaSrl1!', true) }}"
+ansible_connection: ansible.netcommon.httpapi
 ansible_network_os: nokia.srlinux.srlinux
+ansible_httpapi_use_ssl: false
+ansible_httpapi_validate_certs: false
+ansible_httpapi_port: 80
 as_number: 65001
 ospf_area: "0.0.0.0"
+
+

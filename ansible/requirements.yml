@@ -1,0 +1,6 @@
+---
+collections:
+  - name: nokia.srlinux
+    version: ">=0.3.0"
+  - name: ansible.netcommon
+    version: ">=5.0.0"

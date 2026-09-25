@@ -7,8 +7,8 @@ mgmt:
 topology:
   kinds:
     nokia_srlinux:
-      image: ghcr.io/nokia/srlinux:latest
-      type: ixr6
+      image: ghcr.io/nokia/srlinux:24.10.1
+      type: ixrd2l
     linux:
       image: frrouting/frr:v9.1.0
 
@@ -25,8 +25,7 @@ topology:
       kind: linux
       mgmt-ipv4: 172.20.20.13
       binds:
-        - ../ansible/roles/frr_bgp/templates/daemons:/etc/frr/daemons
-        - ../ansible/roles/frr_bgp/templates/frr.conf:/etc/frr/frr.conf
+        - ../ansible/roles/frr_bgp/templates/daemons:/etc/frr/daemons:ro
 
   links:
     # Core Interconnect srl01 <-> srl02
@@ -35,3 +34,5 @@ topology:
     - endpoints: ["srl01:e1-2", "frr01:eth1"]
     # Transit link srl02 <-> frr01
     - endpoints: ["srl02:e1-2", "frr01:eth2"]
+
+

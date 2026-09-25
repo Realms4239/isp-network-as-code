@@ -2,37 +2,41 @@ testbed:
   name: isp-backbone-testbed
   credentials:
     default:
-      username: admin
-      password: admin
+      username: "%ENV{SRL_USER,admin}"
+      password: "%ENV{SRL_PASSWORD,NokiaSrl1!}"
     frr:
-      username: root
-      password: frr
+      username: "%ENV{FRR_USER,root}"
+      password: "%ENV{FRR_PASSWORD,frr}"
 
 devices:
   srl01:
     os: linux
     type: srlinux
+    credentials: default
     connections:
       cli:
         protocol: ssh
         ip: 172.20.20.11
+        port: 22
 
   srl02:
     os: linux
     type: srlinux
+    credentials: default
     connections:
       cli:
         protocol: ssh
         ip: 172.20.20.12
+        port: 22
 
   frr01:
     os: linux
-    type: frr
-    credentials:
-      default:
-        username: root
-        password: frr
+    type: linux
+    credentials: frr
     connections:
       cli:
         protocol: ssh
         ip: 172.20.20.13
+        port: 22
+
+

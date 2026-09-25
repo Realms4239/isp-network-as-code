@@ -1,5 +1,7 @@
 ---
 ansible_user: root
-ansible_connection: ssh
-ansible_ssh_pass: frr
+ansible_connection: ansible.builtin.ssh
+ansible_ssh_pass: "{{ lookup('env', 'FRR_PASSWORD') | default('frr', true) }}"
 as_number: 65002
+
+

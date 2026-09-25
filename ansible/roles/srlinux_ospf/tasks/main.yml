@@ -32,7 +32,7 @@
                 address:
                   - ip-prefix: "{{ loopback_ip }}"
 
-- name: Configure Network Instance Default & Protocols (OSPF + BGP)
+- name: Configure Network Instance Default & Protocols (OSPF)
   nokia.srlinux.config:
     update:
       - path: /network-instance[name=default]
@@ -60,14 +60,69 @@
                         - interface-name: system0.0
                           passive: true
                           admin-state: enable
-            bgp:
+
+- name: Configure permissive routing-policy for loopback advertisement
+  nokia.srlinux.config:
+    update:
+      - path: /routing-policy
+        val:
+          prefix-set:
+            - name: loopbacks
+              prefix:
+                - ip-prefix: "{{ loopback_ip }}"
+                  mask-length-range: exact
+          policy:
+            - name: export-loopbacks
+              statement:
+                - name: "10"
+                  match:
+                    prefix:
+                      prefix-set: "[ loopbacks ]"
+                  action:
+                    policy-result: accept
+
+- name: Configure BGP global, groups, and neighbors (eBGP + iBGP)
+  nokia.srlinux.config:
+    update:
+      - path: /network-instance[name=default]/protocols/bgp
+        val:
+          admin-state: enable
+          autonomous-system: "{{ as_number }}"
+          router-id: "{{ router_id }}"
+          ebgp-default-policy:
+            export-reject-all: false
+            import-reject-all: false
+          afi-safi:
+            - afi-safi-name: ipv4-unicast
               admin-state: enable
-              autonomous-system: "{{ as_number }}"
-              router-id: "{{ router_id }}"
-              group:
-                - group-name: ebgp-transit
-                  peer-as: 65002
+          group:
+            - group-name: ebgp-transit
+              admin-state: enable
+              export-policy: "[ export-loopbacks ]"
+              afi-safi:
+                - afi-safi-name: ipv4-unicast
                   admin-state: enable
-                - group-name: ibgp-core
-                  peer-as: "{{ as_number }}"
+            - group-name: ibgp-core
+              admin-state: enable
+              export-policy: "[ export-loopbacks ]"
+              afi-safi:
+                - afi-safi-name: ipv4-unicast
                   admin-state: enable
+
+- name: Attach individual BGP neighbors to peer-groups
+  nokia.srlinux.config:
+    update:
+      - path: /network-instance[name=default]/protocols/bgp/neighbor[peer-address={{ item.peer_ip }}]
+        val:
+          peer-group: "{{ 'ebgp-transit' if item.remote_as != as_number else 'ibgp-core' }}"
+          peer-as: "{{ item.remote_as }}"
+          description: "{{ item.description }}"
+          admin-state: enable
+          afi-safi:
+            - afi-safi-name: ipv4-unicast
+              admin-state: enable
+  loop: "{{ bgp_peers }}"
+  loop_control:
+    label: "{{ item.peer_ip }} AS{{ item.remote_as }}"
+
+

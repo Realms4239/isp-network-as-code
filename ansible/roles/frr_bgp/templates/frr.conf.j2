@@ -1,6 +1,6 @@
 frr version 9.1
 frr defaults traditional
-hostname frr01
+hostname {{ inventory_hostname }}
 no ipv6 forwarding
 service integrated-vtysh-config
 !
@@ -18,7 +18,7 @@ router bgp {{ as_number }}
  no bgp ebgp-requires-policy
 {% for peer in bgp_peers %}
  neighbor {{ peer.peer_ip }} remote-as {{ peer.remote_as }}
- neighbor {{ peer.peer_ip }} description {{ peer.description }}
+ neighbor {{ peer.peer_ip }} description "{{ peer.description }}"
 {% endfor %}
  !
  address-family ipv4 unicast
@@ -30,3 +30,4 @@ router bgp {{ as_number }}
 !
 line vty
 !
+

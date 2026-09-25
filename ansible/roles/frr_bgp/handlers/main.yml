@@ -1,0 +1,10 @@
+---
+- name: Restart FRR
+  ansible.builtin.service:
+    name: frr
+    state: restarted
+
+- name: Reload FRR
+  ansible.builtin.service:
+    name: frr
+    state: reloaded

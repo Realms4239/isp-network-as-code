@@ -1,0 +1,11 @@
+---
+loopback_ip: "10.0.0.3/32"
+srl01_ip: "10.1.13.2/24"
+srl02_ip: "10.1.23.2/24"
+bgp_peers:
+  - peer_ip: "10.1.13.1"
+    remote_as: 65001
+    description: "eBGP to SRL01"
+  - peer_ip: "10.1.23.1"
+    remote_as: 65001
+    description: "eBGP to SRL02"

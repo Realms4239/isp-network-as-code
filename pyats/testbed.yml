@@ -1,0 +1,38 @@
+testbed:
+  name: isp-backbone-testbed
+  credentials:
+    default:
+      username: admin
+      password: admin
+    frr:
+      username: root
+      password: frr
+
+devices:
+  srl01:
+    os: linux
+    type: srlinux
+    connections:
+      cli:
+        protocol: ssh
+        ip: 172.20.20.11
+
+  srl02:
+    os: linux
+    type: srlinux
+    connections:
+      cli:
+        protocol: ssh
+        ip: 172.20.20.12
+
+  frr01:
+    os: linux
+    type: frr
+    credentials:
+      default:
+        username: root
+        password: frr
+    connections:
+      cli:
+        protocol: ssh
+        ip: 172.20.20.13

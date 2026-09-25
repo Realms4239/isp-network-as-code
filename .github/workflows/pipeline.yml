@@ -1,0 +1,88 @@
+name: NetDevOps Backbone CI/CD
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Code Quality & Linting
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Linting Tools
+        run: |
+          pip install yamllint ansible-lint flake8
+
+      - name: Lint YAML and Topology
+        run: |
+          yamllint topology/ ansible/ pyats/
+
+      - name: Lint Ansible Playbooks
+        run: |
+          ansible-lint ansible/site.yml
+
+  deploy-and-validate:
+    name: Containerlab Spinup, Ansible & pyATS Test
+    runs-on: ubuntu-22.04
+    needs: lint
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl sshpass
+
+      - name: Install Containerlab
+        run: |
+          bash -c "$(curl -sL https://get.containerlab.dev)"
+
+      - name: Install Python & Ansible Dependencies
+        run: |
+          pip install -r pyats/requirements.txt
+          ansible-galaxy collection install nokia.srlinux
+
+      - name: Deploy Containerlab Topology
+        run: |
+          sudo clab deploy -t topology/topology.clab.yml
+
+      - name: Run Ansible Configuration (Run 1)
+        run: |
+          cd ansible
+          ansible-playbook -i inventories/hosts.ini site.yml
+
+      - name: Assert Ansible Idempotency (Run 2: Expect 0 Changed)
+        run: |
+          cd ansible
+          OUTPUT=$(ansible-playbook -i inventories/hosts.ini site.yml)
+          echo "$OUTPUT"
+          # Fail if changed > 0
+          echo "$OUTPUT" | grep -E "changed=0.*unreachable=0.*failed=0" || (echo "Idempotency test failed! Changes detected." && exit 1)
+
+      - name: Execute pyATS Automated Test Suites
+        run: |
+          cd pyats
+          pyats run job test_job.py --testbed-file testbed.yml
+
+      - name: Cleanup Containerlab
+        if: always()
+        run: |
+          sudo clab destroy -t topology/topology.clab.yml --cleanup

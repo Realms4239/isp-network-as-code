@@ -1,0 +1,16 @@
+---
+- name: Ensure FRR daemons configuration is present
+  template:
+    src: daemons
+    dest: /etc/frr/daemons
+    mode: '0644'
+  notify: Restart FRR
+
+- name: Deploy FRR routing configuration (BGP)
+  template:
+    src: frr.conf.j2
+    dest: /etc/frr/frr.conf
+    mode: '0640'
+    owner: frr
+    group: frr
+  notify: Reload FRR

@@ -1,0 +1,73 @@
+---
+- name: Apply Nokia SR Linux Base Interface Configuration
+  nokia.srlinux.config:
+    update:
+      - path: /interface[name=ethernet-1/1]
+        val:
+          admin-state: enable
+          subinterface:
+            - index: 0
+              ipv4:
+                admin-state: enable
+                address:
+                  - ip-prefix: "{{ core_ip }}"
+
+      - path: /interface[name=ethernet-1/2]
+        val:
+          admin-state: enable
+          subinterface:
+            - index: 0
+              ipv4:
+                admin-state: enable
+                address:
+                  - ip-prefix: "{{ transit_ip }}"
+
+      - path: /interface[name=system0]
+        val:
+          admin-state: enable
+          subinterface:
+            - index: 0
+              ipv4:
+                admin-state: enable
+                address:
+                  - ip-prefix: "{{ loopback_ip }}"
+
+- name: Configure Network Instance Default & Protocols (OSPF + BGP)
+  nokia.srlinux.config:
+    update:
+      - path: /network-instance[name=default]
+        val:
+          type: default
+          admin-state: enable
+          router-id: "{{ router_id }}"
+          interface:
+            - name: system0.0
+            - name: ethernet-1/1.0
+            - name: ethernet-1/2.0
+          protocols:
+            ospf:
+              instance:
+                - name: default
+                  admin-state: enable
+                  router-id: "{{ router_id }}"
+                  version: ospf-v2
+                  area:
+                    - area-id: "{{ ospf_area }}"
+                      interface:
+                        - interface-name: ethernet-1/1.0
+                          interface-type: point-to-point
+                          admin-state: enable
+                        - interface-name: system0.0
+                          passive: true
+                          admin-state: enable
+            bgp:
+              admin-state: enable
+              autonomous-system: "{{ as_number }}"
+              router-id: "{{ router_id }}"
+              group:
+                - group-name: ebgp-transit
+                  peer-as: 65002
+                  admin-state: enable
+                - group-name: ibgp-core
+                  peer-as: "{{ as_number }}"
+                  admin-state: enable

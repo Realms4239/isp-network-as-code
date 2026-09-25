@@ -1,0 +1,32 @@
+frr version 9.1
+frr defaults traditional
+hostname frr01
+no ipv6 forwarding
+service integrated-vtysh-config
+!
+interface eth1
+ ip address {{ srl01_ip }}
+!
+interface eth2
+ ip address {{ srl02_ip }}
+!
+interface lo
+ ip address {{ loopback_ip }}
+!
+router bgp {{ as_number }}
+ bgp router-id {{ router_id }}
+ no bgp ebgp-requires-policy
+{% for peer in bgp_peers %}
+ neighbor {{ peer.peer_ip }} remote-as {{ peer.remote_as }}
+ neighbor {{ peer.peer_ip }} description {{ peer.description }}
+{% endfor %}
+ !
+ address-family ipv4 unicast
+  network {{ loopback_ip }}
+{% for peer in bgp_peers %}
+  neighbor {{ peer.peer_ip }} activate
+{% endfor %}
+ exit-address-family
+!
+line vty
+!

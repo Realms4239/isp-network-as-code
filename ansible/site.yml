@@ -1,0 +1,12 @@
+---
+- name: Configure Nokia SR Linux Backbone Nodes (OSPF & BGP)
+  hosts: srlinux
+  gather_facts: false
+  roles:
+    - srlinux_ospf
+
+- name: Configure FRR Transit Core Node (BGP)
+  hosts: frr
+  gather_facts: false
+  roles:
+    - frr_bgp

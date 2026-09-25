@@ -1,0 +1,13 @@
+---
+loopback_ip: "10.0.0.1/32"
+core_ip: "10.1.12.1/24"
+transit_ip: "10.1.13.1/24"
+ospf_neighbors:
+  - interface: "ethernet-1/1.0"
+bgp_peers:
+  - peer_ip: "10.1.13.2"
+    remote_as: 65002
+    description: "eBGP to FRR01"
+  - peer_ip: "10.0.0.2"
+    remote_as: 65001
+    description: "iBGP to SRL02"

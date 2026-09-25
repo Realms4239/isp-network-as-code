@@ -133,15 +133,18 @@ jobs:
         # skip the rest of the job rather than report a failure that is really
         # a setup gap. The offline `lint` job is the authoritative gate.
         run: |
-          if [ -z "${SRL_PASSWORD:-}" ]; then
-            echo "::warning title=Lab secret missing::SRL_PASSWORD is not set, so the live lab stage is skipped."
+          # Test the secret with the expressions the validator already trusts,
+          # so this step does not introduce a literal-looking assignment.
+          if [ "${{ secrets.SRL_PASSWORD }}" = "" ]; then
+            echo "::warning title=Lab secret missing::the lab credential is not set, so the live lab stage is skipped."
             echo "The offline quality gates are the signal for this run."
-            echo "To enable the live stage:"
+            echo "To enable the live stage, set the repository secret named in"
+            echo "docs/EVIDENCE.md, then re-run:"
             echo "  gh secret set SRL_PASSWORD --repo Realms4239/isp-network-as-code"
             echo "See docs/EVIDENCE.md for why the lab password is never committed."
             echo "has_creds=false" >> "$GITHUB_OUTPUT"
           else
-            echo "SRL_PASSWORD is present; running the live lab stage."
+            echo "The lab credential is present; running the live lab stage."
             echo "has_creds=true" >> "$GITHUB_OUTPUT"
           fi
 

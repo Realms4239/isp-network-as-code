@@ -120,6 +120,59 @@ def test_valid_repository_contract():
     assert validate_repository(ROOT) == []
 
 
+def test_role_vars_are_mappings_not_lists():
+    """Ansible requires vars/main.yml to be a dictionary.
+
+    A top-level list fails `ansible-playbook --syntax-check` with "the
+    vars/main.yml file for role '<role>' must contain a dictionary of variables",
+    which surfaces only as an opaque ansible-lint `internal-error`. These checks
+    run offline so the shape is verified before CI ever sees it.
+    """
+    for role_vars in sorted(ROOT.glob("ansible/roles/*/vars/*.yml")):
+        loaded = yaml.safe_load(role_vars.read_text(encoding="utf-8"))
+        assert isinstance(loaded, dict), (
+            f"{role_vars.relative_to(ROOT)} must be a mapping, got "
+            f"{type(loaded).__name__}"
+        )
+
+
+def test_role_vars_define_the_vars_their_tasks_consume():
+    """srlinux_candidate is referenced by tasks/main.yml, so it must exist."""
+    tasks = (ROOT / "ansible/roles/srlinux_ospf/tasks/main.yml").read_text(encoding="utf-8")
+    role_vars = yaml.safe_load(
+        (ROOT / "ansible/roles/srlinux_ospf/vars/main.yml").read_text(encoding="utf-8")
+    )
+    if "srlinux_candidate" in tasks:
+        assert "srlinux_candidate" in role_vars, (
+            "tasks/main.yml consumes srlinux_candidate but vars/main.yml does not define it"
+        )
+        assert isinstance(role_vars["srlinux_candidate"], list)
+        assert role_vars["srlinux_candidate"], "srlinux_candidate must not be empty"
+        for entry in role_vars["srlinux_candidate"]:
+            assert "path" in entry and "value" in entry, (
+                "each candidate entry needs both 'path' and 'value' for nokia.srlinux.config"
+            )
+
+
+def test_ansible_cfg_does_not_pin_collections_path():
+    """collections_path in ansible.cfg overrides ANSIBLE_COLLECTIONS_PATH.
+
+    Pinning it there is what made `ansible-playbook --syntax-check` unable to
+    resolve nokia.srlinux, so the env var is the single source of truth. Only
+    real settings are checked: the file also explains in a comment why the
+    setting is absent, and that must not trip the test.
+    """
+    for raw_line in (ROOT / "ansible/ansible.cfg").read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith(("#", ";", "[")):
+            continue
+        key = line.split("=", 1)[0].strip().lower()
+        assert key != "collections_path", (
+            "ansible.cfg must not set collections_path; it overrides "
+            "ANSIBLE_COLLECTIONS_PATH and breaks collection resolution"
+        )
+
+
 def test_unknown_topology_node_is_rejected(tmp_path):
     fixture = copy_contract_fixture(tmp_path)
     topology_path = fixture / "topology/topology.clab.yml"

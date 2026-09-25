@@ -1,97 +1,106 @@
 ---
-- path: /interface[name=ethernet-1/1]
-  value:
-    admin-state: enable
-    subinterface:
-      - index: 0
-        ipv4:
-          admin-state: enable
-          address:
-            - ip-prefix: "{{ core_ip }}"
-- path: /interface[name=ethernet-1/2]
-  value:
-    admin-state: enable
-    subinterface:
-      - index: 0
-        ipv4:
-          admin-state: enable
-          address:
-            - ip-prefix: "{{ transit_ip }}"
-- path: /interface[name=system0]
-  value:
-    admin-state: enable
-    subinterface:
-      - index: 0
-        ipv4:
-          admin-state: enable
-          address:
+# Role variables MUST be a dictionary. Ansible rejects a top-level list in
+# vars/main.yml with "the vars/main.yml file for role 'srlinux_ospf' must contain
+# a dictionary of variables", which fails `ansible-playbook --syntax-check` and
+# surfaces as an opaque ansible-lint internal-error.
+#
+# The JSON-RPC candidate list is defined once here under a named key and
+# consumed as `srlinux_candidate` in tasks/main.yml, so the payload lives in one
+# place and the role vars stay a valid mapping.
+srlinux_candidate:
+  - path: /interface[name=ethernet-1/1]
+    value:
+      admin-state: enable
+      subinterface:
+        - index: 0
+          ipv4:
+            admin-state: enable
+            address:
+              - ip-prefix: "{{ core_ip }}"
+  - path: /interface[name=ethernet-1/2]
+    value:
+      admin-state: enable
+      subinterface:
+        - index: 0
+          ipv4:
+            admin-state: enable
+            address:
+              - ip-prefix: "{{ transit_ip }}"
+  - path: /interface[name=system0]
+    value:
+      admin-state: enable
+      subinterface:
+        - index: 0
+          ipv4:
+            admin-state: enable
+            address:
+              - ip-prefix: "{{ loopback_ip }}"
+  - path: /network-instance[name=default]
+    value:
+      type: default
+      admin-state: enable
+      router-id: "{{ router_id }}"
+      interface:
+        - name: system0.0
+        - name: ethernet-1/1.0
+        - name: ethernet-1/2.0
+      protocols:
+        ospf:
+          instance:
+            - name: default
+              admin-state: enable
+              router-id: "{{ router_id }}"
+              version: ospf-v2
+              area:
+                - area-id: "{{ ospf_area }}"
+                  interface:
+                    - interface-name: ethernet-1/1.0
+                      interface-type: point-to-point
+                      admin-state: enable
+                    - interface-name: system0.0
+                      passive: true
+                      admin-state: enable
+  - path: /routing-policy
+    value:
+      prefix-set:
+        - name: loopbacks
+          prefix:
             - ip-prefix: "{{ loopback_ip }}"
-- path: /network-instance[name=default]
-  value:
-    type: default
-    admin-state: enable
-    router-id: "{{ router_id }}"
-    interface:
-      - name: system0.0
-      - name: ethernet-1/1.0
-      - name: ethernet-1/2.0
-    protocols:
-      ospf:
-        instance:
-          - name: default
-            admin-state: enable
-            router-id: "{{ router_id }}"
-            version: ospf-v2
-            area:
-              - area-id: "{{ ospf_area }}"
-                interface:
-                  - interface-name: ethernet-1/1.0
-                    interface-type: point-to-point
-                    admin-state: enable
-                  - interface-name: system0.0
-                    passive: true
-                    admin-state: enable
-- path: /routing-policy
-  value:
-    prefix-set:
-      - name: loopbacks
-        prefix:
-          - ip-prefix: "{{ loopback_ip }}"
-            mask-length-range: exact
-    policy:
-      - name: export-loopbacks
-        statement:
-          - name: "10"
-            match:
-              prefix:
-                prefix-set: loopbacks
-            action:
-              policy-result: accept
-- path: /network-instance[name=default]/protocols/bgp
-  value:
-    admin-state: enable
-    autonomous-system: "{{ as_number }}"
-    router-id: "{{ router_id }}"
-    ebgp-default-policy:
-      export-reject-all: true
-      import-reject-all: false
-    afi-safi:
-      - afi-safi-name: ipv4-unicast
-        admin-state: enable
-        export-policy:
-          - export-loopbacks
-    group:
-      - group-name: ebgp-transit
-        admin-state: enable
-        afi-safi:
-          - afi-safi-name: ipv4-unicast
-            admin-state: enable
-            export-policy:
-              - export-loopbacks
-      - group-name: ibgp-core
-        admin-state: enable
-        afi-safi:
-          - afi-safi-name: ipv4-unicast
-            admin-state: enable
-            export-policy:
-              - export-loopbacks
+              mask-length-range: exact
+      policy:
+        - name: export-loopbacks
+          statement:
+            - name: "10"
+              match:
+                prefix:
+                  prefix-set: loopbacks
+              action:
+                policy-result: accept
+  - path: /network-instance[name=default]/protocols/bgp
+    value:
+      admin-state: enable
+      autonomous-system: "{{ as_number }}"
+      router-id: "{{ router_id }}"
+      ebgp-default-policy:
+        export-reject-all: true
+        import-reject-all: false
+      afi-safi:
+        - afi-safi-name: ipv4-unicast
+          admin-state: enable
+          export-policy:
+            - export-loopbacks
+      group:
+        - group-name: ebgp-transit
+          admin-state: enable
+          afi-safi:
+            - afi-safi-name: ipv4-unicast
+              admin-state: enable
+              export-policy:
+                - export-loopbacks
+        - group-name: ibgp-core
+          admin-state: enable
+          afi-safi:
+            - afi-safi-name: ipv4-unicast
+              admin-state: enable
+              export-policy:
+                - export-loopbacks

@@ -255,7 +255,7 @@ jobs:
 
       - name: Upload diagnostics
         if: always() && steps.creds.outputs.has_creds == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: phase0-diagnostics
           path: artifacts-redacted/

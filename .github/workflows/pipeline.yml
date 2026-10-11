@@ -148,6 +148,34 @@ jobs:
             echo "has_creds=true" >> "$GITHUB_OUTPUT"
           fi
 
+      # A job that skips its assertions and still reports green is
+      # indistinguishable, from the outside, from a job that ran them. That is
+      # not hypothetical: the AIR vault recorded "the live lab stage has never
+      # run" for two weeks after this job had already gone green five times, and
+      # the run it was reading as a failure was a pass. Put the fact where a
+      # reader checks a run's meaning - the job summary, which is what a link
+      # shows - and not only in a log line 20 lines up.
+      - name: Record whether the live assertions actually ran
+        if: always()
+        run: |
+          if [ "${{ steps.creds.outputs.has_creds }}" = "true" ]; then
+            {
+              echo "### Live lab stage: RAN"
+              echo ""
+              echo "Containerlab, Ansible and pyATS executed against real SR Linux nodes."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "### Live lab stage: SKIPPED"
+              echo ""
+              echo "This job is green, but **no live assertion ran**: \`SRL_PASSWORD\` is not set."
+              echo "A green conclusion here means the offline gates passed and the reachability"
+              echo "claims are still unproven. Set the secret and re-run before reading this as"
+              echo "end-to-end proof."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::notice title=Green, but the live assertions did not run::no lab credential; reachability remains unproven"
+          fi
+
       - name: Check out repository
         if: steps.creds.outputs.has_creds == 'true'
         uses: actions/checkout@v4

@@ -1,6 +1,6 @@
-pyats==26.8
-genie==26.8
-ansible-core==2.21.4
+pyats==26.9
+genie==26.9
+ansible-core==2.21.5
 ansible-pylibssh==1.4.0
 yamllint==1.38.0
 pytest==9.1.1
